@@ -9,6 +9,7 @@ import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
+import { recordActions } from '../lib/alerts.js'
 import {
   formatDateShort,
   plannerWeek,
@@ -20,13 +21,29 @@ import { useTheme } from '../theme/ThemeProvider.jsx'
 
 export default function Planner() {
   const { c, fonts, radius, text } = useTheme()
-  const { data, loading, error, reload } = useData()
+  const { data, loading, error, reload, deletePlanEntry } = useData()
   const [formOpen, setFormOpen] = useState(false)
   const [draftDate, setDraftDate] = useState(null)
+  const [record, setRecord] = useState(null)
 
   const openForm = (date) => {
+    setRecord(null)
     setDraftDate(date ?? null)
     setFormOpen(true)
+  }
+
+  const entryActions = (id) => {
+    const entry = data.planner.find((item) => item.id === id)
+    if (!entry) return
+    recordActions({
+      title: entry.title,
+      onEdit: () => {
+        setRecord(entry)
+        setDraftDate(null)
+        setFormOpen(true)
+      },
+      onDelete: () => deletePlanEntry(id).catch(() => {}),
+    })
   }
 
   if (loading) {
@@ -102,7 +119,13 @@ export default function Planner() {
                 {day.events.length ? (
                   <View style={{ gap: 8 }}>
                     {day.events.map((event) => (
-                      <View key={event.id} style={{ gap: 1 }}>
+                      <Pressable
+                        key={event.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${event.title}, long press to edit`}
+                        onLongPress={() => entryActions(event.id)}
+                        style={{ gap: 1 }}
+                      >
                         <Text
                           style={{
                             fontFamily: fonts.mono,
@@ -124,7 +147,7 @@ export default function Planner() {
                         >
                           {event.title}
                         </Text>
-                      </View>
+                      </Pressable>
                     ))}
                   </View>
                 ) : (
@@ -142,9 +165,12 @@ export default function Planner() {
         <Card padded={!upcoming.length}>
           {upcoming.length ? (
             upcoming.map((entry, index) => (
-              <View
+              <Pressable
                 key={entry.id}
-                style={{
+                accessibilityRole="button"
+                accessibilityLabel={`${entry.title}, long press to edit`}
+                onLongPress={() => entryActions(entry.id)}
+                style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -153,7 +179,8 @@ export default function Planner() {
                   paddingVertical: 14,
                   borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                   borderTopColor: c.line,
-                }}
+                  backgroundColor: pressed ? c.overline : 'transparent',
+                })}
               >
                 <Text
                   numberOfLines={1}
@@ -171,7 +198,7 @@ export default function Planner() {
                 >
                   {formatDateShort(entry.entry_date)}
                 </Text>
-              </View>
+              </Pressable>
             ))
           ) : (
             <EmptyState
@@ -187,7 +214,16 @@ export default function Planner() {
         </Card>
       </Section>
 
-      <PlanForm visible={formOpen} onClose={() => setFormOpen(false)} date={draftDate} />
+      <PlanForm
+        visible={formOpen}
+        date={draftDate}
+        record={record}
+        onClose={() => {
+          setFormOpen(false)
+          setDraftDate(null)
+          setRecord(null)
+        }}
+      />
     </Screen>
   )
 }

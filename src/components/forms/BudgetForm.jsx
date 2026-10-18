@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
 import Button from '../ui/Button.jsx'
 import Field from '../ui/Field.jsx'
@@ -13,20 +13,22 @@ function currentPeriod() {
   return `${todayISO().slice(0, 7)}-01`
 }
 
-export default function BudgetForm({ visible, onClose }) {
+export default function BudgetForm({ visible, onClose, record }) {
   const { c, fonts, text } = useTheme()
-  const { createBudget } = useData()
+  const { createBudget, updateBudget } = useData()
+  const editing = Boolean(record)
   const [category, setCategory] = useState(MONEY_CATEGORIES[0])
   const [limit, setLimit] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const close = () => {
-    setCategory(MONEY_CATEGORIES[0])
-    setLimit('')
+  useEffect(() => {
+    if (!visible) return
+    setCategory(record?.category ?? MONEY_CATEGORIES[0])
+    setLimit(record ? String(Number(record.limit_amount) || '') : '')
     setError(null)
-    onClose()
-  }
+    setSaving(false)
+  }, [visible, record])
 
   const parsed = Number.parseFloat(limit)
   const valid = Number.isFinite(parsed) && parsed > 0
@@ -36,8 +38,9 @@ export default function BudgetForm({ visible, onClose }) {
     setSaving(true)
     setError(null)
     try {
-      await createBudget({ category, limit_amount: parsed, period: currentPeriod() })
-      close()
+      if (editing) await updateBudget(record.id, { category, limit_amount: parsed })
+      else await createBudget({ category, limit_amount: parsed, period: currentPeriod() })
+      onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the budget.')
       setSaving(false)
@@ -45,7 +48,12 @@ export default function BudgetForm({ visible, onClose }) {
   }
 
   return (
-    <Sheet visible={visible} onClose={close} title="New budget" subtitle="Applies to this month">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={editing ? 'Edit budget' : 'New budget'}
+      subtitle="Applies to this month"
+    >
       <TagPicker label="Category" options={MONEY_CATEGORIES} value={category} onChange={setCategory} />
       <Field
         label="Monthly limit"
@@ -53,14 +61,14 @@ export default function BudgetForm({ visible, onClose }) {
         onChangeText={setLimit}
         placeholder="0.00"
         keyboardType="decimal-pad"
-        autoFocus
+        autoFocus={!editing}
       />
       {error ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
       ) : null}
       <View>
         <Button variant="primary" onPress={submit} loading={saving} disabled={!valid}>
-          Save budget
+          {editing ? 'Save changes' : 'Save budget'}
         </Button>
       </View>
     </Sheet>

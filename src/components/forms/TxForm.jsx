@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Text } from 'react-native'
 import Button from '../ui/Button.jsx'
+import DateField from '../ui/DateField.jsx'
 import Field from '../ui/Field.jsx'
 import Sheet from '../ui/Sheet.jsx'
 import TagPicker from '../ui/TagPicker.jsx'
@@ -11,9 +12,10 @@ import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 const KINDS = ['Expense', 'Income']
 
-export default function TxForm({ visible, onClose }) {
+export default function TxForm({ visible, onClose, record }) {
   const { c, fonts, text } = useTheme()
-  const { createTransaction } = useData()
+  const { createTransaction, updateTransaction } = useData()
+  const editing = Boolean(record)
   const [kind, setKind] = useState('Expense')
   const [merchant, setMerchant] = useState('')
   const [amount, setAmount] = useState('')
@@ -23,16 +25,18 @@ export default function TxForm({ visible, onClose }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const close = () => {
-    setKind('Expense')
-    setMerchant('')
-    setAmount('')
-    setCategory(MONEY_CATEGORIES[0])
-    setAccount('')
-    setDate(todayISO())
+  useEffect(() => {
+    if (!visible) return
+    const signed = Number(record?.amount ?? 0)
+    setKind(signed > 0 ? 'Income' : 'Expense')
+    setMerchant(record?.merchant ?? '')
+    setAmount(record ? String(Math.abs(signed)) : '')
+    setCategory(record?.category ?? MONEY_CATEGORIES[0])
+    setAccount(record?.account ?? '')
+    setDate(record?.occurred_on ?? todayISO())
     setError(null)
-    onClose()
-  }
+    setSaving(false)
+  }, [visible, record])
 
   const parsed = Number.parseFloat(amount)
   const valid = merchant.trim() && Number.isFinite(parsed) && parsed > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)
@@ -42,14 +46,16 @@ export default function TxForm({ visible, onClose }) {
     setSaving(true)
     setError(null)
     try {
-      await createTransaction({
+      const payload = {
         merchant: merchant.trim(),
         amount: kind === 'Expense' ? -Math.abs(parsed) : Math.abs(parsed),
         category,
         account: account.trim() || null,
         occurred_on: date,
-      })
-      close()
+      }
+      if (editing) await updateTransaction(record.id, payload)
+      else await createTransaction(payload)
+      onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the transaction.')
       setSaving(false)
@@ -57,7 +63,7 @@ export default function TxForm({ visible, onClose }) {
   }
 
   return (
-    <Sheet visible={visible} onClose={close} title="New transaction">
+    <Sheet visible={visible} onClose={onClose} title={editing ? 'Edit transaction' : 'New transaction'}>
       <TagPicker label="Type" options={KINDS} value={kind} onChange={setKind} />
       <Field
         label="Amount"
@@ -71,16 +77,16 @@ export default function TxForm({ visible, onClose }) {
         value={merchant}
         onChangeText={setMerchant}
         placeholder="Where or who?"
-        autoFocus
+        autoFocus={!editing}
       />
       <TagPicker label="Category" options={MONEY_CATEGORIES} value={category} onChange={setCategory} />
       <Field label="Account" value={account} onChangeText={setAccount} placeholder="Optional" />
-      <Field label="Date" value={date} onChangeText={setDate} hint="YYYY-MM-DD" />
+      <DateField label="Date" value={date} onChange={setDate} />
       {error ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
       ) : null}
       <Button variant="primary" onPress={submit} loading={saving} disabled={!valid}>
-        Save transaction
+        {editing ? 'Save changes' : 'Save transaction'}
       </Button>
     </Sheet>
   )

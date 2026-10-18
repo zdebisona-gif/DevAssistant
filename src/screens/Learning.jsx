@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
@@ -13,14 +13,34 @@ import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { LEARNING_GOAL_HOURS } from '../data/constants.js'
 import { useData } from '../data/store.jsx'
+import { recordActions } from '../lib/alerts.js'
 import { courseRow, currentStreak, weekHours, weekStack } from '../lib/analytics.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 export default function Learning() {
   const { c, fonts, text } = useTheme()
-  const { data, loading, error, reload } = useData()
+  const { data, loading, error, reload, deleteCourse } = useData()
   const [courseOpen, setCourseOpen] = useState(false)
+  const [courseRecord, setCourseRecord] = useState(null)
   const [sessionOpen, setSessionOpen] = useState(false)
+
+  const openNewCourse = () => {
+    setCourseRecord(null)
+    setCourseOpen(true)
+  }
+
+  const courseActions = (id) => {
+    const course = data.courses.find((item) => item.id === id)
+    if (!course) return
+    recordActions({
+      title: course.name,
+      onEdit: () => {
+        setCourseRecord(course)
+        setCourseOpen(true)
+      },
+      onDelete: () => deleteCourse(id).catch(() => {}),
+    })
+  }
 
   if (loading) {
     return (
@@ -100,7 +120,7 @@ export default function Learning() {
       <Section
         title="Active courses"
         action={
-          <Button size="sm" variant="ghost" onPress={() => setCourseOpen(true)}>
+          <Button size="sm" variant="ghost" onPress={openNewCourse}>
             Add
           </Button>
         }
@@ -108,15 +128,19 @@ export default function Learning() {
         <Card padded={!courses.length}>
           {courses.length ? (
             courses.map((course, index) => (
-              <View
+              <Pressable
                 key={course.id}
-                style={{
+                accessibilityRole="button"
+                accessibilityLabel={`${course.name}, long press to edit`}
+                onLongPress={() => courseActions(course.id)}
+                style={({ pressed }) => ({
                   gap: 10,
                   paddingHorizontal: 16,
                   paddingVertical: 16,
                   borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                   borderTopColor: c.line,
-                }}
+                  backgroundColor: pressed ? c.overline : 'transparent',
+                })}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
                   <Text
@@ -138,14 +162,14 @@ export default function Learning() {
                     {course.next}
                   </Text>
                 ) : null}
-              </View>
+              </Pressable>
             ))
           ) : (
             <EmptyState
               title="No courses yet"
               description="Add a course to track units and see your progress build up."
               action={
-                <Button size="sm" variant="primary" onPress={() => setCourseOpen(true)}>
+                <Button size="sm" variant="primary" onPress={openNewCourse}>
                   Add a course
                 </Button>
               }
@@ -154,7 +178,14 @@ export default function Learning() {
         </Card>
       </Section>
 
-      <CourseForm visible={courseOpen} onClose={() => setCourseOpen(false)} />
+      <CourseForm
+        visible={courseOpen}
+        record={courseRecord}
+        onClose={() => {
+          setCourseOpen(false)
+          setCourseRecord(null)
+        }}
+      />
       <SessionForm visible={sessionOpen} onClose={() => setSessionOpen(false)} />
     </Screen>
   )

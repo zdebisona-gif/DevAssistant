@@ -27,19 +27,37 @@ async function insert(table, row) {
   return data
 }
 
+async function update(table, id, patch) {
+  const { data, error } = await supabase.from(table).update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+async function remove(table, id) {
+  const { error } = await supabase.from(table).delete().eq('id', id)
+  if (error) throw error
+}
+
 export const addNote = (row) => insert('notes', row)
+export const updateNote = (id, patch) => update('notes', id, patch)
+export const deleteNote = (id) => remove('notes', id)
+
 export const addTransaction = (row) => insert('transactions', row)
+export const updateTransaction = (id, patch) => update('transactions', id, patch)
+export const deleteTransaction = (id) => remove('transactions', id)
+
 export const addBudget = (row) => insert('budgets', row)
+export const updateBudget = (id, patch) => update('budgets', id, patch)
+export const deleteBudget = (id) => remove('budgets', id)
+
 export const addCourse = (row) => insert('courses', row)
+export const updateCourse = (id, patch) => update('courses', id, patch)
+export const deleteCourse = (id) => remove('courses', id)
+
 export const addSession = (row) => insert('study_sessions', row)
+export const updateSession = (id, patch) => update('study_sessions', id, patch)
+export const deleteSession = (id) => remove('study_sessions', id)
+
 export const addPlanEntry = (row) => insert('planner_entries', row)
-
-export async function setPlanEntryDone(id, done) {
-  const { error } = await supabase.from('planner_entries').update({ done }).eq('id', id)
-  if (error) throw error
-}
-
-export async function removeNote(id) {
-  const { error } = await supabase.from('notes').delete().eq('id', id)
-  if (error) throw error
-}
+export const updatePlanEntry = (id, patch) => update('planner_entries', id, patch)
+export const deletePlanEntry = (id) => remove('planner_entries', id)

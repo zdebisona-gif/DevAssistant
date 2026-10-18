@@ -35,7 +35,8 @@ not truthfully copy this cross-record grounding.
 - Light and dark appearance, following the device setting.
 - Four kinds of records drive everything: Finances (spending, budgets, transactions), Notes,
   Planner (today and weekly schedule), and Learning (courses, streaks, study hours).
-- Development is UI-first: the shell is built and reviewed before data is real.
+- Records live in Supabase (Postgres). The UI shell was built first, reviewed, then wired to real
+  data; sign-in is the remaining phase before the app is single-user-secure.
 
 ## Capabilities and Constraints
 
@@ -43,9 +44,11 @@ not truthfully copy this cross-record grounding.
   first-run onboarding flow.
 - Ask Zen-I answers questions across the app's records and returns a written answer plus a
   breakdown, an insight, and suggested follow-ups.
-- Data is **sample/local only** right now. All figures are generated locally from
-  `src/data/mock.js`; nothing is uploaded and a later backend phase replaces the previews with
-  live data. A backend is currently undecided, not committed.
+- Data is **live** in Supabase: the app reads and writes the user's own records (notes,
+  transactions, budgets, courses, study sessions, planner entries). Dev access uses temporary
+  permissive RLS policies on the `anon` role; auth (Phase 3) replaces them before shipping.
+- Ask Zen-I is not yet grounded — its answers are still generated locally in
+  `src/data/mock.js`. The grounded engine (Phase 5) is the next backend-facing step.
 - Built as a cross-platform Expo/React Native app (iOS and Android, plus an incidental web
   build), but Android is the design authority for UI decisions.
 - Named "Zen-I Assistant"; app scheme `zeni`.
@@ -60,10 +63,11 @@ not truthfully copy this cross-record grounding.
 
 - Working UI implementation: screens in `src/screens/`, routing in `app/`, shared UI in
   `src/components/`, theme in `src/theme/`.
-- Sample data set in `src/data/mock.js` (transactions, budgets, notes, courses, plans, and
-  canned Ask answers).
-- Absences future work must not fabricate: no real user records, no testimonials, no customers,
-  no benchmarks, no pricing, and no backend/API exist yet.
+- Supabase schema and migration in `supabase/`; data access in `src/lib/db.js` with a single
+  store in `src/data/store.jsx`; all figures derived in `src/lib/analytics.js`.
+- Canned Ask answers still live in `src/data/mock.js`; every other screen reads live rows.
+- Absences future work must not fabricate: no real user testimonials, no customers, no
+  benchmarks, and no pricing.
 
 ## Product Principles
 
@@ -75,5 +79,5 @@ not truthfully copy this cross-record grounding.
    add dashboard clutter or alarm.
 4. **Daily habit.** The app earns a place in a daily routine, so speed to a useful answer and
    low friction matter more than feature breadth.
-5. **Honest about preview state.** Label sample data and undecided phases clearly rather than
-   implying live functionality.
+5. **Honest about state.** Label what is live, what is still previewed, and which phases remain
+   rather than implying functionality that is not there.

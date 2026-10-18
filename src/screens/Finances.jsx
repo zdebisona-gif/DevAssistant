@@ -12,6 +12,7 @@ import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
+import { recordActions } from '../lib/alerts.js'
 import {
   budgetProgress,
   formatDateShort,
@@ -24,10 +25,42 @@ import { useTheme } from '../theme/ThemeProvider.jsx'
 
 export default function Finances() {
   const { c, fonts, text } = useTheme()
-  const { data, loading, error, reload } = useData()
+  const { data, loading, error, reload, deleteTransaction, deleteBudget } = useData()
   const [expanded, setExpanded] = useState(false)
   const [txOpen, setTxOpen] = useState(false)
+  const [txRecord, setTxRecord] = useState(null)
   const [budgetOpen, setBudgetOpen] = useState(false)
+  const [budgetRecord, setBudgetRecord] = useState(null)
+
+  const openNewTx = () => {
+    setTxRecord(null)
+    setTxOpen(true)
+  }
+
+  const openNewBudget = () => {
+    setBudgetRecord(null)
+    setBudgetOpen(true)
+  }
+
+  const txActions = (tx) =>
+    recordActions({
+      title: tx.merchant,
+      onEdit: () => {
+        setTxRecord(tx)
+        setTxOpen(true)
+      },
+      onDelete: () => deleteTransaction(tx.id).catch(() => {}),
+    })
+
+  const budgetActions = (row) =>
+    recordActions({
+      title: row.category,
+      onEdit: () => {
+        setBudgetRecord({ id: row.id, category: row.category, limit_amount: row.limit })
+        setBudgetOpen(true)
+      },
+      onDelete: () => deleteBudget(row.id).catch(() => {}),
+    })
 
   if (loading) {
     return (
@@ -74,7 +107,7 @@ export default function Finances() {
       <Section
         title="Budget"
         action={
-          <Button size="sm" variant="ghost" onPress={() => setBudgetOpen(true)}>
+          <Button size="sm" variant="ghost" onPress={openNewBudget}>
             Add
           </Button>
         }
@@ -83,12 +116,14 @@ export default function Finances() {
           {budgetRows.length ? (
             <View style={{ gap: 14 }}>
               {budgetRows.map((budget) => (
-                <ProgressBar
+                <Pressable
                   key={budget.id}
-                  label={budget.category}
-                  value={budget.spent}
-                  limit={budget.limit}
-                />
+                  accessibilityRole="button"
+                  accessibilityLabel={`${budget.category} budget, long press to edit`}
+                  onLongPress={() => budgetActions(budget)}
+                >
+                  <ProgressBar label={budget.category} value={budget.spent} limit={budget.limit} />
+                </Pressable>
               ))}
             </View>
           ) : (
@@ -96,7 +131,7 @@ export default function Finances() {
               title="No budgets yet"
               description="Add a monthly limit per category to see where you stand."
               action={
-                <Button size="sm" variant="primary" onPress={() => setBudgetOpen(true)}>
+                <Button size="sm" variant="primary" onPress={openNewBudget}>
                   Add a budget
                 </Button>
               }
@@ -120,7 +155,7 @@ export default function Finances() {
                 </Text>
               </Pressable>
             ) : null}
-            <Button size="sm" variant="ghost" onPress={() => setTxOpen(true)}>
+            <Button size="sm" variant="ghost" onPress={openNewTx}>
               Add
             </Button>
           </View>
@@ -131,9 +166,12 @@ export default function Finances() {
             list.map((tx, index) => {
               const positive = Number(tx.amount) > 0
               return (
-                <View
+                <Pressable
                   key={tx.id}
-                  style={{
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tx.merchant}, long press to edit`}
+                  onLongPress={() => txActions(tx)}
+                  style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 12,
@@ -141,7 +179,8 @@ export default function Finances() {
                     paddingVertical: 12,
                     borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                     borderTopColor: c.line,
-                  }}
+                    backgroundColor: pressed ? c.overline : 'transparent',
+                  })}
                 >
                   <View style={{ minWidth: 0, flex: 1, gap: 2 }}>
                     <Text
@@ -168,7 +207,7 @@ export default function Finances() {
                     {positive ? '+' : '−'}
                     {money(tx.amount, 2)}
                   </Text>
-                </View>
+                </Pressable>
               )
             })
           ) : (
@@ -176,7 +215,7 @@ export default function Finances() {
               title="No transactions yet"
               description="Log income and spending to build your monthly picture."
               action={
-                <Button size="sm" variant="primary" onPress={() => setTxOpen(true)}>
+                <Button size="sm" variant="primary" onPress={openNewTx}>
                   Add a transaction
                 </Button>
               }
@@ -185,8 +224,22 @@ export default function Finances() {
         </Card>
       </Section>
 
-      <TxForm visible={txOpen} onClose={() => setTxOpen(false)} />
-      <BudgetForm visible={budgetOpen} onClose={() => setBudgetOpen(false)} />
+      <TxForm
+        visible={txOpen}
+        record={txRecord}
+        onClose={() => {
+          setTxOpen(false)
+          setTxRecord(null)
+        }}
+      />
+      <BudgetForm
+        visible={budgetOpen}
+        record={budgetRecord}
+        onClose={() => {
+          setBudgetOpen(false)
+          setBudgetRecord(null)
+        }}
+      />
     </Screen>
   )
 }

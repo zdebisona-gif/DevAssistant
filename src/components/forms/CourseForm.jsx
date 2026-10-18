@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Text } from 'react-native'
 import Button from '../ui/Button.jsx'
 import Field from '../ui/Field.jsx'
@@ -6,9 +6,10 @@ import Sheet from '../ui/Sheet.jsx'
 import { useData } from '../../data/store.jsx'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
-export default function CourseForm({ visible, onClose }) {
+export default function CourseForm({ visible, onClose, record }) {
   const { c, fonts, text } = useTheme()
-  const { createCourse } = useData()
+  const { createCourse, updateCourse } = useData()
+  const editing = Boolean(record)
   const [name, setName] = useState('')
   const [total, setTotal] = useState('')
   const [completed, setCompleted] = useState('')
@@ -16,14 +17,15 @@ export default function CourseForm({ visible, onClose }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const close = () => {
-    setName('')
-    setTotal('')
-    setCompleted('')
-    setNext('')
+  useEffect(() => {
+    if (!visible) return
+    setName(record?.name ?? '')
+    setTotal(record ? String(record.total_units ?? '') : '')
+    setCompleted(record ? String(record.completed_units ?? '') : '')
+    setNext(record?.next_label ?? '')
     setError(null)
-    onClose()
-  }
+    setSaving(false)
+  }, [visible, record])
 
   const totalUnits = Number.parseInt(total, 10)
   const completedUnits = completed ? Number.parseInt(completed, 10) : 0
@@ -40,13 +42,15 @@ export default function CourseForm({ visible, onClose }) {
     setSaving(true)
     setError(null)
     try {
-      await createCourse({
+      const payload = {
         name: name.trim(),
         total_units: totalUnits,
         completed_units: completedUnits,
         next_label: next.trim() || null,
-      })
-      close()
+      }
+      if (editing) await updateCourse(record.id, payload)
+      else await createCourse(payload)
+      onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the course.')
       setSaving(false)
@@ -54,8 +58,8 @@ export default function CourseForm({ visible, onClose }) {
   }
 
   return (
-    <Sheet visible={visible} onClose={close} title="New course">
-      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Spanish — A2" autoFocus />
+    <Sheet visible={visible} onClose={onClose} title={editing ? 'Edit course' : 'New course'}>
+      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Spanish — A2" autoFocus={!editing} />
       <Field label="Total units" value={total} onChangeText={setTotal} placeholder="50" keyboardType="number-pad" />
       <Field
         label="Completed units"
@@ -69,7 +73,7 @@ export default function CourseForm({ visible, onClose }) {
         <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
       ) : null}
       <Button variant="primary" onPress={submit} loading={saving} disabled={!valid}>
-        Save course
+        {editing ? 'Save changes' : 'Save course'}
       </Button>
     </Sheet>
   )

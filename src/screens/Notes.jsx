@@ -1,4 +1,4 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useMemo, useState } from 'react'
 import { Plus } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
@@ -11,6 +11,7 @@ import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { NOTE_TAGS } from '../data/constants.js'
 import { useData } from '../data/store.jsx'
+import { recordActions } from '../lib/alerts.js'
 import { relativeTime } from '../lib/analytics.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
@@ -19,6 +20,7 @@ export default function Notes() {
   const { data, loading, error, reload, deleteNote } = useData()
   const [filter, setFilter] = useState('All')
   const [formOpen, setFormOpen] = useState(false)
+  const [record, setRecord] = useState(null)
 
   const notes = data.notes
   const filters = useMemo(() => {
@@ -28,15 +30,24 @@ export default function Notes() {
 
   const visible = filter === 'All' ? notes : notes.filter((note) => note.tag === filter)
 
-  const confirmDelete = (note) => {
-    Alert.alert('Delete note', `"${note.title}" will be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteNote(note.id).catch(() => {}) },
-    ])
+  const openNew = () => {
+    setRecord(null)
+    setFormOpen(true)
+  }
+
+  const openActions = (note) => {
+    recordActions({
+      title: note.title,
+      onEdit: () => {
+        setRecord(note)
+        setFormOpen(true)
+      },
+      onDelete: () => deleteNote(note.id).catch(() => {}),
+    })
   }
 
   const header = (
-    <Button size="sm" variant="secondary" icon={Plus} onPress={() => setFormOpen(true)}>
+    <Button size="sm" variant="secondary" icon={Plus} onPress={openNew}>
       New
     </Button>
   )
@@ -101,7 +112,7 @@ export default function Notes() {
                     key={note.id}
                     accessibilityRole="button"
                     accessibilityLabel={`Note: ${note.title}`}
-                    onLongPress={() => confirmDelete(note)}
+                    onLongPress={() => openActions(note)}
                     style={({ pressed }) => ({
                       paddingHorizontal: 16,
                       paddingVertical: 14,
@@ -155,7 +166,7 @@ export default function Notes() {
                   title="No notes yet"
                   description="Capture an idea, a lesson or a decision. It all lands here."
                   action={
-                    <Button size="sm" variant="primary" onPress={() => setFormOpen(true)}>
+                    <Button size="sm" variant="primary" onPress={openNew}>
                       Write the first note
                     </Button>
                   }
@@ -178,7 +189,14 @@ export default function Notes() {
         </>
       )}
 
-      <NoteForm visible={formOpen} onClose={() => setFormOpen(false)} />
+      <NoteForm
+        visible={formOpen}
+        record={record}
+        onClose={() => {
+          setFormOpen(false)
+          setRecord(null)
+        }}
+      />
     </Screen>
   )
 }
