@@ -1,35 +1,78 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Button from '../components/ui/Button.jsx'
+import EmptyState from '../components/ui/EmptyState.jsx'
+import ErrorState from '../components/ui/ErrorState.jsx'
+import Loading from '../components/ui/Loading.jsx'
+import PlanForm from '../components/forms/PlanForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
-import { weekPlan } from '../data/mock.js'
+import { useData } from '../data/store.jsx'
+import {
+  formatDateShort,
+  plannerWeek,
+  todayISO,
+  upcomingEntries,
+  weekRangeLabel,
+} from '../lib/analytics.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
-
-const TODAY_INDEX = 4
-
-const UPCOMING = [
-  { when: 'Tomorrow · 10:00', what: 'Deep work block' },
-  { when: 'Wed · 13:00', what: 'Proposal draft' },
-  { when: 'Thu · 09:30', what: 'Finance lesson 35' },
-  { when: 'Fri · 11:00', what: 'Pay bills' },
-]
 
 export default function Planner() {
   const { c, fonts, radius, text } = useTheme()
+  const { data, loading, error, reload } = useData()
+  const [formOpen, setFormOpen] = useState(false)
+  const [draftDate, setDraftDate] = useState(null)
+
+  const openForm = (date) => {
+    setDraftDate(date ?? null)
+    setFormOpen(true)
+  }
+
+  if (loading) {
+    return (
+      <Screen title="Plan" subtitle="This week">
+        <Loading label="Loading your week" />
+      </Screen>
+    )
+  }
+
+  if (error) {
+    return (
+      <Screen title="Plan" subtitle="This week">
+        <ErrorState error={error} onRetry={reload} />
+      </Screen>
+    )
+  }
+
+  const days = plannerWeek(data.planner)
+  const upcoming = upcomingEntries(data.planner)
+  const today = todayISO()
 
   return (
-    <Screen title="Plan" subtitle="Week 42 · Mon 13 — Sun 19 Oct">
+    <Screen
+      title="Plan"
+      subtitle={weekRangeLabel()}
+      right={
+        <Button size="sm" variant="secondary" onPress={() => openForm()}>
+          New
+        </Button>
+      }
+    >
       <Section title="This week">
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 10, paddingRight: 4 }}
         >
-          {weekPlan.map((day, index) => {
-            const isToday = index === TODAY_INDEX
+          {days.map((day) => {
+            const isToday = day.date === today
             return (
-              <View
-                key={day.day}
+              <Pressable
+                key={day.date}
+                accessibilityRole="button"
+                accessibilityLabel={`Add to ${day.day} ${day.dayNum}`}
+                onPress={() => openForm(day.date)}
                 style={{
                   width: 132,
                   gap: 8,
@@ -52,7 +95,7 @@ export default function Planner() {
                       fontVariant: ['tabular-nums'],
                     }}
                   >
-                    {day.date}
+                    {day.dayNum}
                   </Text>
                 </View>
 
@@ -72,7 +115,12 @@ export default function Planner() {
                         </Text>
                         <Text
                           numberOfLines={2}
-                          style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.foreground }}
+                          style={{
+                            fontFamily: fonts.sansMedium,
+                            fontSize: text.caption,
+                            color: event.done ? c.mutedForeground : c.foreground,
+                            textDecorationLine: event.done ? 'line-through' : 'none',
+                          }}
                         >
                           {event.title}
                         </Text>
@@ -84,48 +132,62 @@ export default function Planner() {
                     Free day
                   </Text>
                 )}
-              </View>
+              </Pressable>
             )
           })}
         </ScrollView>
       </Section>
 
       <Section title="Upcoming">
-        <Card>
-          {UPCOMING.map((item, index) => (
-            <View
-              key={item.what}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
-                borderTopColor: c.line,
-              }}
-            >
-              <Text
-                numberOfLines={1}
-                style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}
-              >
-                {item.what}
-              </Text>
-              <Text
+        <Card padded={!upcoming.length}>
+          {upcoming.length ? (
+            upcoming.map((entry, index) => (
+              <View
+                key={entry.id}
                 style={{
-                  fontFamily: fonts.mono,
-                  fontSize: text.micro,
-                  color: c.mutedForeground,
-                  fontVariant: ['tabular-nums'],
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+                  borderTopColor: c.line,
                 }}
               >
-                {item.when}
-              </Text>
-            </View>
-          ))}
+                <Text
+                  numberOfLines={1}
+                  style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}
+                >
+                  {entry.title}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: fonts.mono,
+                    fontSize: text.micro,
+                    color: c.mutedForeground,
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {formatDateShort(entry.entry_date)}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <EmptyState
+              title="Nothing coming up"
+              description="Add an entry to a day this week, or plan something further out."
+              action={
+                <Button size="sm" variant="primary" onPress={() => openForm()}>
+                  Add an entry
+                </Button>
+              }
+            />
+          )}
         </Card>
       </Section>
+
+      <PlanForm visible={formOpen} onClose={() => setFormOpen(false)} date={draftDate} />
     </Screen>
   )
 }

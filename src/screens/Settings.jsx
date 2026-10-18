@@ -1,15 +1,16 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { CaretRight, Database, Info } from 'phosphor-react-native'
+import { CaretRight, Database, Info } from '../icons.js'
 import { Pressable, Text, View } from 'react-native'
 import Screen from '../components/layout/Screen.jsx'
 import { Card, CardBody, CardHeader } from '../components/ui/Card.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
+import { useData } from '../data/store.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 function Row({ label, value, onPress, right }) {
-  const { c, fonts } = useTheme()
+  const { c, fonts, text } = useTheme()
   return (
     <Pressable
       accessibilityRole="button"
@@ -23,11 +24,11 @@ function Row({ label, value, onPress, right }) {
         backgroundColor: pressed ? c.overline : 'transparent',
       })}
     >
-      <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 14, color: c.foreground }}>
+      <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}>
         {label}
       </Text>
       {value ? (
-        <Text style={{ fontFamily: fonts.sans, fontSize: 13, color: c.mutedForeground }}>
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
           {value}
         </Text>
       ) : null}
@@ -36,8 +37,30 @@ function Row({ label, value, onPress, right }) {
   )
 }
 
+function CountRow({ label, count }) {
+  const { c, fonts, text } = useTheme()
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: text.caption,
+          color: c.foreground,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {count}
+      </Text>
+    </View>
+  )
+}
+
 export default function Settings() {
-  const { c, fonts, mode } = useTheme()
+  const { c, fonts, text } = useTheme()
+  const { data, reload } = useData()
   const { reset } = useOnboarding()
   const router = useRouter()
 
@@ -53,7 +76,7 @@ export default function Settings() {
         <CardHeader title="Appearance" subtitle="Light or dark" />
         <Row
           label="Theme"
-          value={mode === 'light' ? 'Light' : 'Dark'}
+          value={undefined}
           onPress={undefined}
           right={<ThemeToggle />}
         />
@@ -65,19 +88,36 @@ export default function Settings() {
       </Card>
 
       <Card>
-        <CardHeader title="Data" subtitle="Where these numbers come from" />
-        <CardBody>
+        <CardHeader
+          title="Data"
+          subtitle="Live from your Supabase project"
+          action={
+            <Pressable accessibilityRole="button" onPress={() => reload()} hitSlop={8}>
+              <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
+                Refresh
+              </Text>
+            </Pressable>
+          }
+        />
+        <CardBody style={{ gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Database size={14} weight="bold" color={c.mutedForeground} />
-            <Text style={{ fontFamily: fonts.sans, fontSize: 12, color: c.mutedForeground }}>
-              Preview data · v0.1
+            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+              Connected · v0.2
             </Text>
           </View>
+          <View style={{ gap: 8 }}>
+            <CountRow label="Notes" count={data.notes.length} />
+            <CountRow label="Transactions" count={data.transactions.length} />
+            <CountRow label="Budgets" count={data.budgets.length} />
+            <CountRow label="Plan entries" count={data.planner.length} />
+            <CountRow label="Courses" count={data.courses.length} />
+            <CountRow label="Study sessions" count={data.sessions.length} />
+          </View>
           <Text
-            style={{ fontFamily: fonts.sans, fontSize: 12, lineHeight: 18, color: c.mutedForeground }}
+            style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
           >
-            Every figure in the app is sample data generated locally. Nothing is uploaded and
-            nothing leaves your device.
+            Records are stored in your Supabase project. Nothing is shared with anyone else.
           </Text>
         </CardBody>
       </Card>
@@ -87,15 +127,15 @@ export default function Settings() {
         <CardBody>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Info size={14} weight="bold" color={c.mutedForeground} />
-            <Text style={{ fontFamily: fonts.sans, fontSize: 12, color: c.mutedForeground }}>
-              Local preview build · 1.0.0
+            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+              Build 1.0.0
             </Text>
           </View>
           <Text
-            style={{ fontFamily: fonts.sans, fontSize: 11, lineHeight: 17, color: c.mutedForeground }}
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
           >
-            A personal assistant for notes, finances, planning and learning. The backend phase
-            connects real records and turns the previews into live data.
+            A personal assistant for notes, finances, planning and learning. Records are live; sign-in
+            and record-grounded answers arrive in later phases.
           </Text>
         </CardBody>
       </Card>

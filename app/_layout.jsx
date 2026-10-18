@@ -1,11 +1,16 @@
-import { FiraCode_400Regular, FiraCode_500Medium, FiraCode_600SemiBold, FiraCode_700Bold } from '@expo-google-fonts/fira-code'
-import { FiraSans_400Regular, FiraSans_500Medium, FiraSans_600SemiBold, FiraSans_700Bold } from '@expo-google-fonts/fira-sans'
+import { FiraCode_400Regular } from '@expo-google-fonts/fira-code/400Regular'
+import { FiraCode_500Medium } from '@expo-google-fonts/fira-code/500Medium'
+import { FiraCode_600SemiBold } from '@expo-google-fonts/fira-code/600SemiBold'
+import { FiraSans_400Regular } from '@expo-google-fonts/fira-sans/400Regular'
+import { FiraSans_500Medium } from '@expo-google-fonts/fira-sans/500Medium'
+import { FiraSans_600SemiBold } from '@expo-google-fonts/fira-sans/600SemiBold'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { DataProvider } from '../src/data/store.jsx'
 import { OnboardingProvider, useOnboarding } from '../src/lib/onboarding.js'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider.jsx'
 
@@ -51,19 +56,19 @@ export default function RootLayout() {
     FiraSans_400Regular,
     FiraSans_500Medium,
     FiraSans_600SemiBold,
-    FiraSans_700Bold,
     FiraCode_400Regular,
     FiraCode_500Medium,
     FiraCode_600SemiBold,
-    FiraCode_700Bold,
   })
 
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <OnboardingProvider>
-          {fontsLoaded ? <RootStack /> : null}
-        </OnboardingProvider>
+        <DataProvider>
+          <OnboardingProvider>
+            {fontsLoaded ? <RootStack /> : null}
+          </OnboardingProvider>
+        </DataProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   )
