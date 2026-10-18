@@ -1,4 +1,4 @@
-import { CaretLeft } from 'phosphor-react-native'
+import { CaretLeft } from '../../icons.js'
 import { useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'

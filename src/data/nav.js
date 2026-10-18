@@ -4,7 +4,7 @@ import {
   House,
   Notebook,
   Sparkle,
-} from 'phosphor-react-native'
+} from '../icons.js'
 
 /*
  * Bottom navigation: four destinations plus one raised action.

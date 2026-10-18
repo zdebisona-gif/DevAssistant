@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics'
-import { Moon, Sun } from 'phosphor-react-native'
+import { Moon, Sun } from '../../icons.js'
 import { Pressable } from 'react-native'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 

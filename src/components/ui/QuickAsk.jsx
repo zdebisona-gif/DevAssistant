@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { PaperPlaneRight, Sparkle } from 'phosphor-react-native'
+import { PaperPlaneRight, Sparkle } from '../../icons.js'
 import { useState } from 'react'
 import { Keyboard, StyleSheet, TextInput, View } from 'react-native'
 import { askSuggestions } from '../../data/mock.js'

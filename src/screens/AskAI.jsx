@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router'
-import { PaperPlaneRight, Sparkle } from 'phosphor-react-native'
+import { PaperPlaneRight, Sparkle } from '../icons.js'
 import { useEffect, useRef, useState } from 'react'
 import {
   Animated,

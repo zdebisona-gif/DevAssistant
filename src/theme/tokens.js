@@ -101,11 +101,9 @@ export const fonts = {
   sans: 'FiraSans_400Regular',
   sansMedium: 'FiraSans_500Medium',
   sansSemiBold: 'FiraSans_600SemiBold',
-  sansBold: 'FiraSans_700Bold',
   mono: 'FiraCode_400Regular',
   monoMedium: 'FiraCode_500Medium',
   monoSemiBold: 'FiraCode_600SemiBold',
-  monoBold: 'FiraCode_700Bold',
 }
 
 /* Shared motion timings. One easing curve, three durations. */
