@@ -47,8 +47,9 @@ not truthfully copy this cross-record grounding.
 - Data is **live** in Supabase: the app reads and writes the user's own records (notes,
   transactions, budgets, courses, study sessions, planner entries). Dev access uses temporary
   permissive RLS policies on the `anon` role; auth (Phase 3) replaces them before shipping.
-- Ask Zen-I is not yet grounded — its answers are still generated locally in
-  `src/data/mock.js`. The grounded engine (Phase 5) is the next backend-facing step.
+- Ask Zen-I is grounded: answers are computed from the user's records in `src/lib/ask.js` and
+  return a written answer, a breakdown, an insight, follow-ups and a Sources line naming which
+  records were read. No model is called.
 - Built as a cross-platform Expo/React Native app (iOS and Android, plus an incidental web
   build), but Android is the design authority for UI decisions.
 - Named "Zen-I Assistant"; app scheme `zeni`.
@@ -65,7 +66,8 @@ not truthfully copy this cross-record grounding.
   `src/components/`, theme in `src/theme/`.
 - Supabase schema and migration in `supabase/`; data access in `src/lib/db.js` with a single
   store in `src/data/store.jsx`; all figures derived in `src/lib/analytics.js`.
-- Canned Ask answers still live in `src/data/mock.js`; every other screen reads live rows.
+- Grounded Ask engine in `src/lib/ask.js` (pure functions) with recent-ask history in
+  `src/lib/askHistory.js`; every screen reads live rows.
 - Absences future work must not fabricate: no real user testimonials, no customers, no
   benchmarks, and no pricing.
 

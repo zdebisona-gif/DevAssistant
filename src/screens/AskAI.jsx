@@ -17,10 +17,12 @@ import Screen from '../components/layout/Screen.jsx'
 import Button from '../components/ui/Button.jsx'
 import Chip from '../components/ui/Chip.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
-import { askHistory, askSuggestions, buildAnswer } from '../data/mock.js'
+import { useData } from '../data/store.jsx'
+import { answerQuery, deriveSuggestions } from '../lib/ask.js'
+import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
-function AssistantMessage({ message }) {
+function AssistantMessage({ message, onFollowUp }) {
   const { c, fonts, radius, text } = useTheme()
   const { answer, breakdown, insight, followUps } = message
   return (
@@ -66,9 +68,17 @@ function AssistantMessage({ message }) {
       {followUps?.length ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {followUps.map((followUp) => (
-            <Chip key={followUp}>{followUp}</Chip>
+            <Chip key={followUp} onPress={() => onFollowUp?.(followUp)}>
+              {followUp}
+            </Chip>
           ))}
         </View>
+      ) : null}
+
+      {message.sources?.length ? (
+        <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+          Sources · {message.sources.join(' · ')} · {message.queriedAt}
+        </Text>
       ) : null}
     </View>
   )
@@ -135,12 +145,20 @@ function ThinkingBubble() {
 export default function AskAI() {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
+  const { data } = useData()
   const { q } = useLocalSearchParams()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
+  const [history, setHistory] = useState([])
   const scrollRef = useRef(null)
   const handled = useRef(null)
+
+  const suggestions = deriveSuggestions(data)
+
+  useEffect(() => {
+    loadAskHistory().then(setHistory)
+  }, [])
 
   const ask = (question) => {
     const value = question.trim()
@@ -148,13 +166,14 @@ export default function AskAI() {
     setMessages((prev) => [...prev, { id: `u${prev.length}`, role: 'user', text: value }])
     setInput('')
     setPending(true)
+    pushAskHistory(value, history).then(setHistory)
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
-        { id: `a${prev.length}`, role: 'assistant', ...buildAnswer(value) },
+        { id: `a${prev.length}`, role: 'assistant', ...answerQuery(value, data) },
       ])
       setPending(false)
-    }, 650)
+    }, 400)
   }
 
   useEffect(() => {
@@ -206,32 +225,34 @@ export default function AskAI() {
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {askSuggestions.map((suggestion) => (
+                {suggestions.map((suggestion) => (
                   <Chip key={suggestion} onPress={() => ask(suggestion)}>
                     {suggestion}
                   </Chip>
                 ))}
               </View>
-              <View style={{ gap: 8 }}>
-                <Text
-                  style={{
-                    fontFamily: fonts.sansSemiBold,
-                    fontSize: text.micro,
-                    letterSpacing: 0.6,
-                    textTransform: 'uppercase',
-                    color: c.mutedForeground,
-                  }}
-                >
-                  Recent
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {askHistory.map((query) => (
-                    <Chip key={query} onPress={() => ask(query)}>
-                      {query}
-                    </Chip>
-                  ))}
+              {history.length ? (
+                <View style={{ gap: 8 }}>
+                  <Text
+                    style={{
+                      fontFamily: fonts.sansSemiBold,
+                      fontSize: text.micro,
+                      letterSpacing: 0.6,
+                      textTransform: 'uppercase',
+                      color: c.mutedForeground,
+                    }}
+                  >
+                    Recent
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {history.map((query) => (
+                      <Chip key={query} onPress={() => ask(query)}>
+                        {query}
+                      </Chip>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              ) : null}
             </View>
           ) : null}
 
@@ -239,7 +260,7 @@ export default function AskAI() {
             message.role === 'user' ? (
               <UserMessage key={message.id} text={message.text} />
             ) : (
-              <AssistantMessage key={message.id} message={message} />
+              <AssistantMessage key={message.id} message={message} onFollowUp={ask} />
             ),
           )}
 

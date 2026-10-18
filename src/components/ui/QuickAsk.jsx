@@ -2,15 +2,18 @@ import { useRouter } from 'expo-router'
 import { PaperPlaneRight, Sparkle } from '../../icons.js'
 import { useState } from 'react'
 import { Keyboard, StyleSheet, TextInput, View } from 'react-native'
-import { askSuggestions } from '../../data/mock.js'
+import { useData } from '../../data/store.jsx'
+import { deriveSuggestions } from '../../lib/ask.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 import Button from './Button.jsx'
 import Chip from './Chip.jsx'
 
 export default function QuickAsk() {
   const { c, fonts, radius, text } = useTheme()
+  const { data } = useData()
   const router = useRouter()
   const [value, setValue] = useState('')
+  const suggestions = deriveSuggestions(data, 3)
 
   const submit = (raw) => {
     const q = raw.trim()
@@ -64,7 +67,7 @@ export default function QuickAsk() {
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {askSuggestions.slice(0, 3).map((suggestion) => (
+        {suggestions.map((suggestion) => (
           <Chip key={suggestion} onPress={() => submit(suggestion)}>
             {suggestion}
           </Chip>
