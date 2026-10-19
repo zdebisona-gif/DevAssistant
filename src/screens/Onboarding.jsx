@@ -321,7 +321,7 @@ export default function Onboarding() {
         </View>
 
         <Text style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.mutedForeground, textAlign: 'center' }}>
-          Sample data until the backend phase
+          Private to your account · one sign-in per device
         </Text>
       </View>
     </View>

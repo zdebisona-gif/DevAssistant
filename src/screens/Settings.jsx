@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { CaretRight, Database, Info, Sparkle } from '../icons.js'
-import { Pressable, Switch, Text, View } from 'react-native'
+import { CaretRight, Database, Info, LockKey, SignOut, Sparkle } from '../icons.js'
+import { Alert, Pressable, Switch, Text, View } from 'react-native'
 import Screen from '../components/layout/Screen.jsx'
 import { Card, CardBody, CardHeader } from '../components/ui/Card.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
 import { useData } from '../data/store.jsx'
+import { useAuth } from '../data/auth.jsx'
 import { remainingToday, useAiPrefs } from '../data/aiPrefs.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
@@ -62,6 +63,7 @@ function CountRow({ label, count }) {
 export default function Settings() {
   const { c, fonts, text } = useTheme()
   const { data, reload } = useData()
+  const { user, signOut } = useAuth()
   const { reset } = useOnboarding()
   const { enabled: aiEnabled, setEnabled: setAiEnabled, usage } = useAiPrefs()
   const router = useRouter()
@@ -79,8 +81,45 @@ export default function Settings() {
     router.replace('/welcome')
   }
 
+  const confirmSignOut = () => {
+    Haptics.selectionAsync().catch(() => {})
+    Alert.alert('Sign out?', 'You will need to sign in again to see your records.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: () => {
+          signOut().catch(() => {})
+        },
+      },
+    ])
+  }
+
   return (
-    <Screen title="Settings" subtitle="Appearance, intro and data" left="back">
+    <Screen title="Settings" subtitle="Account, appearance, intro and data" left="back">
+      <Card>
+        <CardHeader title="Account" subtitle="This device stays signed in" />
+        <CardBody style={{ gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <LockKey size={14} weight="bold" color={c.mutedForeground} />
+            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+              {user?.email ?? 'Signed in'}
+            </Text>
+          </View>
+          <Text
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+          >
+            Every note, transaction, plan and project belongs to this account. Signing out hides
+            them from this device.
+          </Text>
+        </CardBody>
+        <Row
+          label="Sign out"
+          onPress={confirmSignOut}
+          right={<SignOut size={14} weight="bold" color={c.destructive} />}
+        />
+      </Card>
+
       <Card>
         <CardHeader title="Appearance" subtitle="Light or dark" />
         <Row
@@ -142,7 +181,7 @@ export default function Settings() {
       <Card>
         <CardHeader
           title="Data"
-          subtitle="Live from your Supabase project"
+          subtitle="Live from your account"
           action={
             <Pressable accessibilityRole="button" onPress={() => reload()} hitSlop={8}>
               <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
@@ -155,7 +194,7 @@ export default function Settings() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Database size={14} weight="bold" color={c.mutedForeground} />
             <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-              Connected · v0.2
+              Connected · v0.3
             </Text>
           </View>
           <View style={{ gap: 8 }}>
@@ -171,7 +210,8 @@ export default function Settings() {
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
           >
-            Records are stored in your Supabase project. Nothing is shared with anyone else.
+            Records are stored in your private Supabase account and are only readable while signed
+            in. Nothing is shared with anyone else.
           </Text>
         </CardBody>
       </Card>
@@ -188,8 +228,8 @@ export default function Settings() {
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
           >
-            A personal assistant for notes, finances, planning and learning. Records are live; sign-in
-            and record-grounded answers arrive in later phases.
+            A personal assistant for notes, finances, planning and learning. Records are live and
+            private to your account; answers are grounded in them.
           </Text>
         </CardBody>
       </Card>

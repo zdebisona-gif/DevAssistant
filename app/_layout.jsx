@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { AuthProvider, useAuth } from '../src/data/auth.jsx'
 import { DataProvider } from '../src/data/store.jsx'
 import { FocusProvider } from '../src/data/focus.jsx'
 import { AiPrefsProvider } from '../src/data/aiPrefs.jsx'
@@ -20,19 +21,28 @@ SplashScreen.preventAutoHideAsync().catch(() => {})
 
 function RootStack() {
   const { c, mode } = useTheme()
+  const { session, loading: authLoading } = useAuth()
   const { ready, onboarded } = useOnboarding()
   const segments = useSegments()
   const router = useRouter()
+  const signedIn = !!session
 
   useEffect(() => {
-    if (!ready) return
+    if (authLoading || !ready) return
     SplashScreen.hideAsync().catch(() => {})
+    const inSignIn = segments[0] === 'sign-in'
     const inWelcome = segments[0] === 'welcome'
-    if (!onboarded && !inWelcome) router.replace('/welcome')
-    else if (onboarded && inWelcome) router.replace('/')
-  }, [ready, onboarded, segments, router])
 
-  if (!ready) return null
+    if (!signedIn) {
+      if (!inSignIn) router.replace('/sign-in')
+    } else if (!onboarded) {
+      if (!inWelcome) router.replace('/welcome')
+    } else if (inSignIn || inWelcome) {
+      router.replace('/')
+    }
+  }, [authLoading, ready, signedIn, onboarded, segments, router])
+
+  if (authLoading || !ready) return null
 
   return (
     <>
@@ -43,11 +53,16 @@ function RootStack() {
           contentStyle: { backgroundColor: c.background },
         }}
       >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-        <Stack.Screen name="ask" options={{ animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="learning" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+        <Stack.Protected guard={!signedIn}>
+          <Stack.Screen name="sign-in" options={{ animation: 'fade' }} />
+        </Stack.Protected>
+        <Stack.Protected guard={signedIn}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+          <Stack.Screen name="ask" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="learning" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+        </Stack.Protected>
       </Stack>
     </>
   )
@@ -66,15 +81,17 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <DataProvider>
-          <FocusProvider>
-            <AiPrefsProvider>
-              <OnboardingProvider>
-                {fontsLoaded ? <RootStack /> : null}
-              </OnboardingProvider>
-            </AiPrefsProvider>
-          </FocusProvider>
-        </DataProvider>
+        <AuthProvider>
+          <DataProvider>
+            <FocusProvider>
+              <AiPrefsProvider>
+                <OnboardingProvider>
+                  {fontsLoaded ? <RootStack /> : null}
+                </OnboardingProvider>
+              </AiPrefsProvider>
+            </FocusProvider>
+          </DataProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   )

@@ -10,6 +10,13 @@ export default function Field({
   multiline = false,
   keyboardType,
   autoFocus = false,
+  secureTextEntry = false,
+  autoCapitalize,
+  autoComplete,
+  textContentType,
+  onSubmitEditing,
+  returnKeyType,
+  editable = true,
 }) {
   const { c, fonts, radius, text } = useTheme()
   return (
@@ -25,6 +32,13 @@ export default function Field({
         multiline={multiline}
         keyboardType={keyboardType}
         autoFocus={autoFocus}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        textContentType={textContentType}
+        onSubmitEditing={onSubmitEditing}
+        returnKeyType={returnKeyType}
+        editable={editable}
         style={{
           minHeight: multiline ? 88 : 46,
           borderRadius: radius.md,

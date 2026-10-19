@@ -41,6 +41,8 @@ export function describeGeminiError(error) {
     case 'timeout':
     case 'network':
       return 'Could not reach Gemini just now.'
+    case 'unauthorized':
+      return 'Sign in to use Gemini.'
     case 'empty':
       return 'Gemini returned nothing.'
     default:
@@ -82,6 +84,7 @@ async function invokeProxy(body) {
       cooldownUntil = Date.now() + COOLDOWN_MS
       throw new GeminiUnavailable('rate-limit')
     }
+    if (status === 401) throw new GeminiUnavailable('unauthorized')
     if (status === 503) throw new GeminiUnavailable('not-configured')
     throw new GeminiUnavailable('proxy', status || undefined)
   }
@@ -92,6 +95,7 @@ async function invokeProxy(body) {
       throw new GeminiUnavailable(data.error)
     }
     if (data.error === 'not-configured') throw new GeminiUnavailable('not-configured')
+    if (data.error === 'unauthorized') throw new GeminiUnavailable('unauthorized')
     throw new GeminiUnavailable('proxy', data.error)
   }
 

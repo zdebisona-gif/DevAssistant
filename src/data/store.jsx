@@ -9,6 +9,7 @@
 import { AppState } from 'react-native'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as db from '../lib/db.js'
+import { useAuth } from './auth.jsx'
 
 const EMPTY = {
   budgets: [],
@@ -25,11 +26,18 @@ const EMPTY = {
 const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
+  const { uid } = useAuth()
   const [data, setData] = useState(EMPTY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const reload = useCallback(async () => {
+    if (!uid) {
+      setData(EMPTY)
+      setError(null)
+      setLoading(false)
+      return
+    }
     setError(null)
     try {
       setData(await db.loadAll())
@@ -38,26 +46,28 @@ export function DataProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [uid])
 
   useEffect(() => {
+    setLoading(true)
     reload()
   }, [reload])
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') reload()
+      if (state === 'active' && uid) reload()
     })
     return () => sub.remove()
-  }, [reload])
+  }, [reload, uid])
 
   const mutate = useCallback(
     async (operation) => {
+      if (!uid) throw new Error('Sign in to change records.')
       const result = await operation()
       await reload()
       return result
     },
-    [reload],
+    [reload, uid],
   )
 
   const value = useMemo(

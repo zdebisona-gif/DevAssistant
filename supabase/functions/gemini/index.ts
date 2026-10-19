@@ -7,9 +7,13 @@
  *   - a server-side daily request cap (default 50), tracked in public.ai_usage
  *   - bounded input/output so a single call can never grow unbounded
  *
- * Deploy:  npx supabase functions deploy gemini --use-api --no-verify-jwt
+ * Deploy:  npx supabase functions deploy gemini --use-api
  * Secret:  npx supabase secrets set GEMINI_API_KEY=<free-tier-key>
  * Optional: GEMINI_MODEL (must be on the allowlist), GEMINI_DAILY_CAP
+ *
+ * The gateway runs with verify_jwt = true (supabase/config.toml), but it still accepts
+ * the publishable `apikey` on its own as an anonymous credential. The handler therefore
+ * also requires a signed-in user's JWT (an `authenticated` token with a `sub`).
  */
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -187,6 +191,31 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, 'content-type': 'application/json' },
   })
 
+/*
+ * The gateway has already validated the JWT's signature before the function runs, but it
+ * also lets a bare publishable key through as an anonymous credential. Only a real user
+ * token carries an `authenticated` role and a `sub`; an API key (new or legacy) does not.
+ */
+function signedInUserId(req: Request): string | null {
+  const header = req.headers.get('authorization') ?? ''
+  const match = /^Bearer\s+(\S+)$/i.exec(header.trim())
+  if (!match) return null
+
+  const parts = match[1].split('.')
+  if (parts.length !== 3) return null
+
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+    const claims = JSON.parse(atob(padded))
+    return claims?.role === 'authenticated' && typeof claims?.sub === 'string' && claims.sub
+      ? claims.sub
+      : null
+  } catch {
+    return null
+  }
+}
+
 const BASE_RULES = [
   'You are Zen-I, a calm personal assistant inside a private records app.',
   'Answer in plain conversational text, 1-4 short sentences. No markdown headings.',
@@ -261,6 +290,7 @@ function requestFor(task: string, question: string, context: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405)
+  if (!signedInUserId(req)) return json({ error: 'unauthorized' }, 401)
 
   if (!GEMINI_API_KEY) return json({ error: 'not-configured' }, 503)
   if (!FREE_MODELS.has(MODEL)) return json({ error: 'model-not-allowed', model: MODEL }, 500)

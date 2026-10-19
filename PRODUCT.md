@@ -36,8 +36,9 @@ not truthfully copy this cross-record grounding.
 - Five kinds of records drive everything: Finances (spending, budgets, transactions), Notes,
   Planner (today and weekly schedule), Learning (courses, streaks, study hours, a focus timer and
   per-session takeaways), and Projects (deadline deliverables, assessments and a penalty ledger).
-- Records live in Supabase (Postgres). The UI shell was built first, reviewed, then wired to real
-  data; sign-in is the remaining phase before the app is single-user-secure.
+- Records live in Supabase (Postgres) and belong to the signed-in account. The app requires an
+  email/password sign-in once per device, and per-user RLS keeps every row readable only by its
+  owner.
 
 ## Capabilities and Constraints
 
@@ -46,9 +47,9 @@ not truthfully copy this cross-record grounding.
 - Ask Zen-I answers questions across the app's records and returns a written answer plus a
   breakdown, an insight, and suggested follow-ups.
 - Data is **live** in Supabase: the app reads and writes the user's own records (notes,
-  transactions, budgets, courses, study sessions, planner entries, projects and penalties). Dev
-  access uses temporary permissive RLS policies on the `anon` role; auth (Phase 3) replaces them
-  before shipping.
+  transactions, budgets, courses, study sessions, planner entries, projects and penalties). Every
+  row is owned by the signed-in account through `auth.uid()` defaults and owner-only RLS policies;
+  the `anon` role has no table access.
 - Ask Zen-I is grounded: answers are computed from the user's records in `src/lib/ask.js` and
   return a written answer, a breakdown, an insight, follow-ups and a Sources line naming which
   records were read. This on-device engine is the default answer path.
@@ -59,7 +60,8 @@ not truthfully copy this cross-record grounding.
   totals, study hours, plan entries) — never note bodies, individual transactions, passwords, keys
   or account numbers. Answers are labelled "Local answer" or "AI · Gemini", and any failure falls
   back to the local answer.
-- Gemini runs behind a Supabase Edge Function proxy (`supabase/functions/gemini/`): the API key is
+- Gemini runs behind a Supabase Edge Function proxy (`supabase/functions/gemini/`) that requires a
+  signed-in session: the API key is
   a server-side secret, restricted to free-tier models, with a server-side daily request cap tracked
   in `public.ai_usage` and bounded input/output. There is no API key in the app and no billing
   account, so usage cannot incur charges. Settings shows the remaining requests for the day.
