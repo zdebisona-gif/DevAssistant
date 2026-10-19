@@ -47,6 +47,11 @@ const ACTIONS = [
   'create_note',
   'update_note',
   'delete_note',
+  'create_course',
+  'add_course_unit',
+  'complete_course_unit',
+  'delete_course_unit',
+  'create_study_plan',
 ] as const
 
 const ACTION_SCHEMA = {
@@ -69,6 +74,13 @@ const ACTION_SCHEMA = {
         date: { type: 'string' },
         time: { type: 'string' },
         limit: { type: 'number' },
+        name: { type: 'string' },
+        units: { type: 'number' },
+        weekly_target: { type: 'number' },
+        next: { type: 'string' },
+        course: { type: 'string' },
+        unit: { type: 'string' },
+        scope: { type: 'string', enum: ['general', 'study'] },
       },
     },
   },
@@ -84,6 +96,38 @@ const ACTION_RULES = [
   'Resolve relative dates to YYYY-MM-DD using the provided Today. Times are 24-hour "HH:MM".',
   'Prefer the allowed categories and tags listed in the context. Return JSON only.',
 ].join(' ')
+
+const PLAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: ['entry', 'unit'] },
+          title: { type: 'string' },
+          date: { type: 'string' },
+          time: { type: 'string' },
+          tag: { type: 'string' },
+          course: { type: 'string' },
+        },
+        required: ['kind', 'title'],
+      },
+    },
+  },
+  required: ['items'],
+}
+
+const PLAN_RULES = [
+  'You propose at most 12 short, concrete plan items for a private personal app.',
+  'Return JSON only. Use only the facts in the context; never invent courses, goals or events.',
+  'kind "entry" = a calendar block: fill date as YYYY-MM-DD within the horizon, time as 24-hour "HH:MM" (empty string if none), and tag from the allowed plan tags.',
+  'kind "unit" = a study unit for a course: fill course with the exact course name from the context, leave date and time empty, and make the title a single next step.',
+  'Only use kind "unit" when the scope is study and the course is listed in the context.',
+  'Keep titles under 60 characters. Do not duplicate existing entries.',
+].join(' ')
+
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -126,6 +170,19 @@ function requestFor(task: string, question: string, context: string) {
         maxOutputTokens: 300,
         responseMimeType: 'application/json',
         responseSchema: ACTION_SCHEMA,
+      },
+    }
+  }
+
+  if (task === 'generate-plan') {
+    return {
+      systemInstruction: { parts: [{ text: PLAN_RULES }] },
+      contents: [{ role: 'user', parts: [{ text: `${question}\n\n${context}` }] }],
+      generationConfig: {
+        temperature: 0.5,
+        maxOutputTokens: 800,
+        responseMimeType: 'application/json',
+        responseSchema: PLAN_SCHEMA,
       },
     }
   }
@@ -228,6 +285,22 @@ Deno.serve(async (req) => {
         confidence: parsed?.confidence === 'low' ? 'low' : 'high',
         args: parsed?.args && typeof parsed.args === 'object' ? parsed.args : {},
       },
+      model: MODEL,
+      remaining: Math.max(0, DAILY_CAP - used),
+      cap: DAILY_CAP,
+    })
+  }
+
+  if (task === 'generate-plan') {
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return json({ error: 'bad-plan' }, 502)
+    }
+    const items = Array.isArray(parsed?.items) ? parsed.items.slice(0, 12) : []
+    return json({
+      json: { items },
       model: MODEL,
       remaining: Math.max(0, DAILY_CAP - used),
       cap: DAILY_CAP,

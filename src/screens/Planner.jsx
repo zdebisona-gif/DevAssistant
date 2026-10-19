@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { PencilSimple, Trash } from '../icons.js'
+import { PencilSimple, Sparkle, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
+import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
@@ -28,6 +29,7 @@ export default function Planner() {
   const [formOpen, setFormOpen] = useState(false)
   const [draftDate, setDraftDate] = useState(null)
   const [record, setRecord] = useState(null)
+  const [aiOpen, setAiOpen] = useState(false)
   const { open, sheet } = useRowActions()
 
   const openForm = (date) => {
@@ -93,7 +95,14 @@ export default function Planner() {
         </Button>
       }
     >
-      <Section title="This week">
+      <Section
+        title="This week"
+        action={
+          <Button size="sm" variant="ghost" icon={Sparkle} onPress={() => setAiOpen(true)}>
+            Plan with AI
+          </Button>
+        }
+      >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -246,6 +255,7 @@ export default function Planner() {
           setRecord(null)
         }}
       />
+      <PlanWithAi visible={aiOpen} defaultScope="general" onClose={() => setAiOpen(false)} />
       {sheet}
     </Screen>
   )

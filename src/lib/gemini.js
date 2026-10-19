@@ -146,3 +146,25 @@ export async function extractAction({ text, context = '' }) {
     cap: data.cap,
   }
 }
+
+/**
+ * Ask the proxy to propose plan items (entries and/or course units).
+ * @returns {Promise<{ items: Array<object>, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function generatePlan({ scope = 'general', horizon = 'week', goal = '', context = '' }) {
+  const question = [
+    `Scope: ${scope}`,
+    `Horizon: ${horizon}`,
+    `Goal: ${String(goal || '').trim() || '(none given — propose from the week)'}`,
+  ].join('\n')
+
+  const data = await invokeProxy({
+    task: 'generate-plan',
+    question: question.slice(0, 500),
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const items = Array.isArray(data?.json?.items) ? data.json.items : []
+  return { items, model: data.model, remaining: data.remaining, cap: data.cap }
+}

@@ -15,6 +15,7 @@ const EMPTY = {
   transactions: [],
   notes: [],
   courses: [],
+  units: [],
   sessions: [],
   planner: [],
 }
@@ -75,6 +76,22 @@ export function DataProvider({ children }) {
       createCourse: (row) => mutate(() => db.addCourse(row)),
       updateCourse: (id, patch) => mutate(() => db.updateCourse(id, patch)),
       deleteCourse: (id) => mutate(() => db.deleteCourse(id)),
+      createCourseUnit: (row) => mutate(() => db.addCourseUnit(row)),
+      updateCourseUnit: (id, patch) => mutate(() => db.updateCourseUnit(id, patch)),
+      deleteCourseUnit: (id) => mutate(() => db.deleteCourseUnit(id)),
+      completeCourseUnit: (id, done) =>
+        mutate(async () => {
+          const unit = data.units.find((item) => item.id === id)
+          await db.updateCourseUnit(id, { done })
+          const course = unit ? data.courses.find((item) => item.id === unit.course_id) : null
+          if (course) {
+            const total = Number(course.total_units) || 0
+            const next = Math.max(0, (Number(course.completed_units) || 0) + (done ? 1 : -1))
+            await db.updateCourse(course.id, {
+              completed_units: total > 0 ? Math.min(next, total) : next,
+            })
+          }
+        }),
       createSession: (row) => mutate(() => db.addSession(row)),
       updateSession: (id, patch) => mutate(() => db.updateSession(id, patch)),
       deleteSession: (id) => mutate(() => db.deleteSession(id)),

@@ -18,6 +18,7 @@ import {
   normalizeTime,
   parsePositive,
   validateBudget,
+  validateCourse,
   validateNote,
   validatePlanEntry,
   validateTransaction,
@@ -35,6 +36,10 @@ export const ALLOWED_ACTIONS = [
   'create_note',
   'update_note',
   'delete_note',
+  'create_course',
+  'add_course_unit',
+  'complete_course_unit',
+  'delete_course_unit',
 ]
 
 const ALLOWED = new Set(ALLOWED_ACTIONS)
@@ -417,6 +422,84 @@ function buildDeleteNote(args, data) {
   })
 }
 
+function buildCreateCourse(args) {
+  const checked = validateCourse({
+    name: args.name || args.title,
+    total_units: args.units || args.total_units,
+    completed_units: 0,
+    weekly_target_hours: args.weekly_target || 0,
+    next_label: args.next,
+  })
+  if (!checked.ok) return fail(checked.error)
+  const payload = checked.payload
+  return ok('create_course', 'local', {
+    payload,
+    summary: `Add the course “${payload.name}”`,
+    details: [
+      { label: 'Course', value: payload.name },
+      { label: 'Total units', value: String(payload.total_units) },
+      ...(payload.weekly_target_hours ? [{ label: 'Weekly target', value: `${payload.weekly_target_hours}h` }] : []),
+    ],
+  })
+}
+
+function resolveCourseNamed(data, query) {
+  const active = (data.courses || []).filter((course) => course.active !== false)
+  return resolveTarget(active, query, (course) => course.name)
+}
+
+function buildAddCourseUnit(args, data) {
+  const found = resolveCourseNamed(data, args.course || args.target)
+  if (!found.ok) return found
+  const title = String(args.unit || args.title || '').trim()
+  if (!title) return fail('Name the unit to add.')
+  const position = (data.units || []).filter((unit) => unit.course_id === found.row.id).length
+  return ok('add_course_unit', 'local', {
+    payload: { course_id: found.row.id, title, position },
+    summary: `Add the unit “${title}” to ${found.row.name}`,
+    details: [
+      { label: 'Course', value: found.row.name },
+      { label: 'Unit', value: title },
+    ],
+  })
+}
+
+function resolveUnitNamed(data, courseId, query) {
+  const units = (data.units || []).filter((unit) => unit.course_id === courseId)
+  return resolveTarget(units, query, (unit) => unit.title)
+}
+
+function buildCompleteCourseUnit(args, data) {
+  const course = resolveCourseNamed(data, args.course || args.target)
+  if (!course.ok) return course
+  const unit = resolveUnitNamed(data, course.row.id, args.unit || args.target)
+  if (!unit.ok) return unit
+  return ok('complete_course_unit', 'local', {
+    target: { id: unit.row.id, label: unit.row.title },
+    summary: `Mark “${unit.row.title}” complete in ${course.row.name}`,
+    details: [
+      { label: 'Course', value: course.row.name },
+      { label: 'Unit', value: unit.row.title },
+    ],
+  })
+}
+
+function buildDeleteCourseUnit(args, data) {
+  const course = resolveCourseNamed(data, args.course || args.target)
+  if (!course.ok) return course
+  const unit = resolveUnitNamed(data, course.row.id, args.unit || args.target)
+  if (!unit.ok) return unit
+  return ok('delete_course_unit', 'local', {
+    target: { id: unit.row.id, label: unit.row.title },
+    summary: `Delete the unit “${unit.row.title}” from ${course.row.name}`,
+    details: [
+      { label: 'Course', value: course.row.name },
+      { label: 'Unit', value: unit.row.title },
+    ],
+    destructive: true,
+  })
+}
+
 const BUILDERS = {
   create_transaction: (args) => buildCreateTransaction(args),
   update_transaction: buildUpdateTransaction,
@@ -429,6 +512,10 @@ const BUILDERS = {
   create_note: (args) => buildCreateNote(args),
   update_note: buildUpdateNote,
   delete_note: buildDeleteNote,
+  create_course: (args) => buildCreateCourse(args),
+  add_course_unit: buildAddCourseUnit,
+  complete_course_unit: buildCompleteCourseUnit,
+  delete_course_unit: buildDeleteCourseUnit,
 }
 
 export function buildProposal(action, args, data) {
@@ -592,6 +679,14 @@ export async function runAction(services, proposal) {
       return services.updateNote(proposal.target.id, proposal.payload)
     case 'delete_note':
       return services.deleteNote(proposal.target.id)
+    case 'create_course':
+      return services.createCourse(proposal.payload)
+    case 'add_course_unit':
+      return services.createCourseUnit(proposal.payload)
+    case 'complete_course_unit':
+      return services.completeCourseUnit(proposal.target.id, true)
+    case 'delete_course_unit':
+      return services.deleteCourseUnit(proposal.target.id)
     default:
       throw new Error('That action is not allowed.')
   }
@@ -609,4 +704,8 @@ export const ACTION_LABELS = {
   create_note: 'Save note',
   update_note: 'Update note',
   delete_note: 'Delete note',
+  create_course: 'Add course',
+  add_course_unit: 'Add unit',
+  complete_course_unit: 'Complete unit',
+  delete_course_unit: 'Delete unit',
 }

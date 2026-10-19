@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { PencilSimple, Play, Trash } from '../icons.js'
+import { Check, PencilSimple, Play, Sparkle, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
@@ -8,6 +8,8 @@ import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
+import CourseUnits from '../components/assistant/CourseUnits.jsx'
+import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
 import CourseForm from '../components/forms/CourseForm.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
 import SessionForm from '../components/forms/SessionForm.jsx'
@@ -41,6 +43,8 @@ export default function Learning() {
   const [sessionRecord, setSessionRecord] = useState(null)
   const [sessionDefaults, setSessionDefaults] = useState(null)
   const [planOpen, setPlanOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
+  const [unitsCourse, setUnitsCourse] = useState(null)
   const { open, sheet } = useRowActions()
 
   const openNewCourse = () => {
@@ -66,6 +70,7 @@ export default function Learning() {
       title: course.name,
       subtitle: 'Course',
       actions: [
+        { key: 'units', label: 'Units', icon: Check, onPress: () => setUnitsCourse(course) },
         { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditCourse(course) },
         {
           key: 'delete',
@@ -187,9 +192,14 @@ export default function Learning() {
       <Section
         title="Today's study"
         action={
-          <Button size="sm" variant="ghost" onPress={() => setPlanOpen(true)}>
-            Plan
-          </Button>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button size="sm" variant="ghost" onPress={() => setPlanOpen(true)}>
+              Plan
+            </Button>
+            <Button size="sm" variant="ghost" icon={Sparkle} onPress={() => setAiOpen(true)}>
+              Plan with AI
+            </Button>
+          </View>
         }
       >
         <Card padded={!blocks.length}>
@@ -463,6 +473,12 @@ export default function Learning() {
         visible={planOpen}
         tag="Study"
         onClose={() => setPlanOpen(false)}
+      />
+      <PlanWithAi visible={aiOpen} defaultScope="study" onClose={() => setAiOpen(false)} />
+      <CourseUnits
+        visible={Boolean(unitsCourse)}
+        course={unitsCourse}
+        onClose={() => setUnitsCourse(null)}
       />
       {sheet}
     </Screen>

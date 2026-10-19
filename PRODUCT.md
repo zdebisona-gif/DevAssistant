@@ -70,6 +70,13 @@ not truthfully copy this cross-record grounding.
   with the exact change before it runs, and deletes are flagged as irreversible. Targets for edits
   and deletes are matched against rows already in memory, so record titles and ids are never sent
   to Gemini.
+- "Plan with AI" is a shared capability, not a Learning-only feature: one sheet with a General or
+  Study scope (the scope toggle appears only when a course exists), a horizon of Today / This week /
+  Next 7 days, and an optional goal. Study scope falls back to a deterministic local plan when AI is
+  off or unavailable; General scope prompts to turn AI on instead. Proposals are always previewed as
+  a checkbox list ("Add N of M") before anything is written, and one generation is one AI request.
+- Courses carry units (`public.course_units`); completing a unit advances the course's completed
+  count without logging a study session.
 - Learning is connected, not isolated: a focus timer records real sessions (persisted across
   restarts), sessions link to a course and capture a takeaway, today's Study-tagged planner blocks
   are startable from Learning, courses carry a weekly hour target, and saving a takeaway also
@@ -94,7 +101,8 @@ not truthfully copy this cross-record grounding.
 - Grounded Ask engine in `src/lib/ask.js` (pure functions) with recent-ask history in
   `src/lib/askHistory.js`; per-domain context builders in `src/lib/context.js`; Gemini routing and
   the proxy client in `src/lib/intent.js` and `src/lib/gemini.js`; the on/off preference and usage
-  reading in `src/data/aiPrefs.jsx`; every screen reads live rows.
+  reading in `src/data/aiPrefs.jsx`; the plan generator, horizons and deterministic study fallback in
+  `src/lib/planWithAi.js`; every screen reads live rows.
 - Absences future work must not fabricate: no real user testimonials, no customers, no
   benchmarks, and no pricing.
 

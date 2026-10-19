@@ -10,15 +10,16 @@ async function selectAll(table, order) {
 
 /** Fetch every table the app reads. Rows are tiny, so one round-trip each is fine. */
 export async function loadAll() {
-  const [budgets, transactions, notes, courses, sessions, planner] = await Promise.all([
+  const [budgets, transactions, notes, courses, units, sessions, planner] = await Promise.all([
     selectAll('budgets', { column: 'category' }),
     selectAll('transactions', { column: 'occurred_on', ascending: false }),
     selectAll('notes', { column: 'updated_at', ascending: false }),
     selectAll('courses', { column: 'position' }),
+    selectAll('course_units', { column: 'position' }),
     selectAll('study_sessions', { column: 'studied_on' }),
     selectAll('planner_entries', { column: 'entry_date' }),
   ])
-  return { budgets, transactions, notes, courses, sessions, planner }
+  return { budgets, transactions, notes, courses, units, sessions, planner }
 }
 
 async function insert(table, row) {
@@ -53,6 +54,10 @@ export const deleteBudget = (id) => remove('budgets', id)
 export const addCourse = (row) => insert('courses', row)
 export const updateCourse = (id, patch) => update('courses', id, patch)
 export const deleteCourse = (id) => remove('courses', id)
+
+export const addCourseUnit = (row) => insert('course_units', row)
+export const updateCourseUnit = (id, patch) => update('course_units', id, patch)
+export const deleteCourseUnit = (id) => remove('course_units', id)
 
 export const addSession = (row) => insert('study_sessions', row)
 export const updateSession = (id, patch) => update('study_sessions', id, patch)

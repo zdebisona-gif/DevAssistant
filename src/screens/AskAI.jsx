@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Screen from '../components/layout/Screen.jsx'
 import ActionConfirm from '../components/assistant/ActionConfirm.jsx'
+import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
 import Button from '../components/ui/Button.jsx'
 import Chip from '../components/ui/Chip.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
@@ -26,6 +27,7 @@ import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
 import { buildContextFor } from '../lib/context.js'
 import { askGemini, describeGeminiError, extractAction, inCooldown } from '../lib/gemini.js'
 import { classifyIntent } from '../lib/intent.js'
+import { inferScope, looksLikePlanRequest } from '../lib/planWithAi.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 function fallbackNote(error) {
@@ -152,6 +154,38 @@ function UserMessage({ text: content }) {
   )
 }
 
+function PlannerMessage({ message, onOpen }) {
+  const { c, fonts, radius, text } = useTheme()
+  return (
+    <View
+      style={{
+        gap: 10,
+        borderRadius: radius.lg,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: c.border,
+        backgroundColor: c.card,
+        padding: 14,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Sparkle size={16} weight="duotone" color={c.primary} />
+        <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.micro, color: c.foreground }}>
+          Zen-I
+        </Text>
+      </View>
+      <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 20, color: c.body }}>
+        Want me to draft a{message.scope === 'study' ? ' study' : ''} plan? You review and confirm each
+        item before anything is added.
+      </Text>
+      <View style={{ flexDirection: 'row' }}>
+        <Button variant="primary" icon={Sparkle} onPress={onOpen}>
+          Plan with AI
+        </Button>
+      </View>
+    </View>
+  )
+}
+
 function ThinkingBubble() {
   const { c } = useTheme()
   const dots = useRef([new Animated.Value(0.35), new Animated.Value(0.35), new Animated.Value(0.35)]).current
@@ -199,6 +233,8 @@ export default function AskAI() {
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
   const [history, setHistory] = useState([])
+  const [planOpen, setPlanOpen] = useState(false)
+  const [planScope, setPlanScope] = useState('general')
   const scrollRef = useRef(null)
   const handled = useRef(null)
 
@@ -222,6 +258,15 @@ export default function AskAI() {
 
     let outcome = parseLocalAction(value, data)
     let triedAction = false
+
+    if (!outcome && looksLikePlanRequest(value)) {
+      setMessages((prev) => [
+        ...prev,
+        { id: `a${stamp}`, role: 'assistant', kind: 'planner', scope: inferScope(value) },
+      ])
+      setPending(false)
+      return
+    }
 
     if (!outcome && looksLikeCommand(value) && aiEnabled && !inCooldown()) {
       triedAction = true
@@ -399,6 +444,15 @@ export default function AskAI() {
                 onConfirm={() => confirmAction(message.id)}
                 onCancel={() => cancelAction(message.id)}
               />
+            ) : message.kind === 'planner' ? (
+              <PlannerMessage
+                key={message.id}
+                message={message}
+                onOpen={() => {
+                  setPlanScope(message.scope || 'general')
+                  setPlanOpen(true)
+                }}
+              />
             ) : (
               <AssistantMessage key={message.id} message={message} onFollowUp={ask} />
             ),
@@ -450,6 +504,7 @@ export default function AskAI() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <PlanWithAi visible={planOpen} defaultScope={planScope} onClose={() => setPlanOpen(false)} />
     </Screen>
   )
 }
