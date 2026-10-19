@@ -1,18 +1,21 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useMemo, useState } from 'react'
-import { Plus } from '../icons.js'
+import { Eye, PencilSimple, Plus, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import NoteForm from '../components/forms/NoteForm.jsx'
+import NoteView from '../components/views/NoteView.jsx'
+import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { NOTE_TAGS } from '../data/constants.js'
 import { useData } from '../data/store.jsx'
-import { recordActions } from '../lib/alerts.js'
+import { confirmDelete } from '../lib/alerts.js'
 import { relativeTime } from '../lib/analytics.js'
+import { useRowActions } from '../lib/rowActions.jsx'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 export default function Notes() {
@@ -21,6 +24,8 @@ export default function Notes() {
   const [filter, setFilter] = useState('All')
   const [formOpen, setFormOpen] = useState(false)
   const [record, setRecord] = useState(null)
+  const [viewing, setViewing] = useState(null)
+  const { open, sheet } = useRowActions()
 
   const notes = data.notes
   const filters = useMemo(() => {
@@ -35,16 +40,27 @@ export default function Notes() {
     setFormOpen(true)
   }
 
-  const openActions = (note) => {
-    recordActions({
-      title: note.title,
-      onEdit: () => {
-        setRecord(note)
-        setFormOpen(true)
-      },
-      onDelete: () => deleteNote(note.id).catch(() => {}),
-    })
+  const openEdit = (note) => {
+    setRecord(note)
+    setFormOpen(true)
   }
+
+  const openActions = (note) =>
+    open({
+      title: note.title,
+      subtitle: note.tag ?? undefined,
+      actions: [
+        { key: 'view', label: 'View note', icon: Eye, onPress: () => setViewing(note) },
+        { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEdit(note) },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: Trash,
+          destructive: true,
+          onPress: () => confirmDelete(note.title, () => deleteNote(note.id).catch(() => {})),
+        },
+      ],
+    })
 
   const header = (
     <Button size="sm" variant="secondary" icon={Plus} onPress={openNew}>
@@ -112,48 +128,57 @@ export default function Notes() {
                     key={note.id}
                     accessibilityRole="button"
                     accessibilityLabel={`Note: ${note.title}`}
-                    onLongPress={() => openActions(note)}
+                    onPress={() => setViewing(note)}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      paddingLeft: 16,
+                      paddingRight: 8,
                       paddingVertical: 14,
-                      gap: 4,
                       borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                       borderTopColor: c.line,
                       backgroundColor: pressed ? c.overline : 'transparent',
                     })}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
-                      <Text
-                        numberOfLines={1}
-                        style={{ flex: 1, fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}
-                      >
-                        {note.title}
-                      </Text>
-                      {note.tag ? (
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
                         <Text
-                          style={{
-                            fontFamily: fonts.sansMedium,
-                            fontSize: text.micro,
-                            letterSpacing: 0.4,
-                            textTransform: 'uppercase',
-                            color: c.mutedForeground,
-                          }}
+                          numberOfLines={1}
+                          style={{ flex: 1, fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}
                         >
-                          {note.tag}
+                          {note.title}
+                        </Text>
+                        {note.tag ? (
+                          <Text
+                            style={{
+                              fontFamily: fonts.sansMedium,
+                              fontSize: text.micro,
+                              letterSpacing: 0.4,
+                              textTransform: 'uppercase',
+                              color: c.mutedForeground,
+                            }}
+                          >
+                            {note.tag}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {note.body ? (
+                        <Text
+                          numberOfLines={2}
+                          style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
+                        >
+                          {note.body}
                         </Text>
                       ) : null}
-                    </View>
-                    {note.body ? (
-                      <Text
-                        numberOfLines={2}
-                        style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
-                      >
-                        {note.body}
+                      <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+                        {relativeTime(note.updated_at)}
                       </Text>
-                    ) : null}
-                    <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                      {relativeTime(note.updated_at)}
-                    </Text>
+                    </View>
+                    <RowMenuButton
+                      accessibilityLabel={`${note.title}, more options`}
+                      onPress={() => openActions(note)}
+                    />
                   </Pressable>
                 ))}
               </Card>
@@ -197,6 +222,24 @@ export default function Notes() {
           setRecord(null)
         }}
       />
+      <NoteView
+        note={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={() => {
+          const note = viewing
+          setViewing(null)
+          if (note) openEdit(note)
+        }}
+        onDelete={() => {
+          if (!viewing) return
+          const note = viewing
+          confirmDelete(note.title, () => {
+            setViewing(null)
+            deleteNote(note.id).catch(() => {})
+          })
+        }}
+      />
+      {sheet}
     </Screen>
   )
 }

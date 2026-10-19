@@ -1,10 +1,9 @@
 import { Alert } from 'react-native'
 
-/** Long-press menu for a record row: Edit, Delete or Cancel. */
-export function recordActions({ title, onEdit, onDelete }) {
-  Alert.alert(title, undefined, [
-    { text: 'Edit', onPress: onEdit },
-    { text: 'Delete', style: 'destructive', onPress: onDelete },
+/** Confirmation step before a destructive delete. */
+export function confirmDelete(title, onConfirm) {
+  Alert.alert(`Delete ${title}?`, 'This cannot be undone.', [
     { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete', style: 'destructive', onPress: onConfirm },
   ])
 }

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { PencilSimple, Play, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
+import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import CourseForm from '../components/forms/CourseForm.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
@@ -15,8 +17,8 @@ import { Card } from '../components/ui/Card.jsx'
 import { LEARNING_GOAL_HOURS } from '../data/constants.js'
 import { formatElapsed, useFocus } from '../data/focus.jsx'
 import { useData } from '../data/store.jsx'
-import { Play } from '../icons.js'
-import { recordActions } from '../lib/alerts.js'
+import { confirmDelete } from '../lib/alerts.js'
+import { useRowActions } from '../lib/rowActions.jsx'
 import {
   courseRow,
   courseWeekHours,
@@ -39,9 +41,15 @@ export default function Learning() {
   const [sessionRecord, setSessionRecord] = useState(null)
   const [sessionDefaults, setSessionDefaults] = useState(null)
   const [planOpen, setPlanOpen] = useState(false)
+  const { open, sheet } = useRowActions()
 
   const openNewCourse = () => {
     setCourseRecord(null)
+    setCourseOpen(true)
+  }
+
+  const openEditCourse = (course) => {
+    setCourseRecord(course)
     setCourseOpen(true)
   }
 
@@ -54,27 +62,47 @@ export default function Learning() {
   const courseActions = (id) => {
     const course = data.courses.find((item) => item.id === id)
     if (!course) return
-    recordActions({
+    open({
       title: course.name,
-      onEdit: () => {
-        setCourseRecord(course)
-        setCourseOpen(true)
-      },
-      onDelete: () => deleteCourse(id).catch(() => {}),
+      subtitle: 'Course',
+      actions: [
+        { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditCourse(course) },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: Trash,
+          destructive: true,
+          onPress: () => confirmDelete(course.name, () => deleteCourse(id).catch(() => {})),
+        },
+      ],
     })
   }
 
   const sessionActions = (id) => {
     const record = data.sessions.find((item) => item.id === id)
     if (!record) return
-    recordActions({
+    open({
       title: record.takeaway || `${Number(record.hours)}h session`,
-      onEdit: () => {
-        setSessionRecord(record)
-        setSessionDefaults(null)
-        setSessionOpen(true)
-      },
-      onDelete: () => deleteSession(id).catch(() => {}),
+      subtitle: formatDateShort(record.studied_on),
+      actions: [
+        {
+          key: 'edit',
+          label: 'Edit',
+          icon: PencilSimple,
+          onPress: () => {
+            setSessionRecord(record)
+            setSessionDefaults(null)
+            setSessionOpen(true)
+          },
+        },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: Trash,
+          destructive: true,
+          onPress: () => confirmDelete(`${Number(record.hours)}h session`, () => deleteSession(id).catch(() => {})),
+        },
+      ],
     })
   }
 
@@ -269,8 +297,8 @@ export default function Learning() {
                 <Pressable
                   key={course.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`${course.name}, long press to edit`}
-                  onLongPress={() => courseActions(course.id)}
+                  accessibilityLabel={course.name}
+                  onPress={() => openEditCourse(raw)}
                   style={({ pressed }) => ({
                     gap: 10,
                     paddingHorizontal: 16,
@@ -280,7 +308,7 @@ export default function Learning() {
                     backgroundColor: pressed ? c.overline : 'transparent',
                   })}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text
                       numberOfLines={1}
                       style={{ flex: 1, fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}
@@ -290,6 +318,11 @@ export default function Learning() {
                     <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
                       {course.detail}
                     </Text>
+                    <RowMenuButton
+                      compact
+                      accessibilityLabel={`${course.name}, more options`}
+                      onPress={() => courseActions(course.id)}
+                    />
                   </View>
                   <ProgressBar label="Progress" value={course.progress} percentOnly />
                   {target > 0 ? (
@@ -352,18 +385,23 @@ export default function Learning() {
               <Pressable
                 key={record.id}
                 accessibilityRole="button"
-                accessibilityLabel={`Session, long press to edit`}
-                onLongPress={() => sessionActions(record.id)}
+                accessibilityLabel={`Session`}
+                onPress={() => {
+                  setSessionRecord(record)
+                  setSessionDefaults(null)
+                  setSessionOpen(true)
+                }}
                 style={({ pressed }) => ({
                   gap: 4,
-                  paddingHorizontal: 16,
+                  paddingLeft: 16,
+                  paddingRight: 8,
                   paddingVertical: 14,
                   borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                   borderTopColor: c.line,
                   backgroundColor: pressed ? c.overline : 'transparent',
                 })}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text
                     numberOfLines={1}
                     style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}
@@ -373,6 +411,11 @@ export default function Learning() {
                   <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
                     {Number(record.hours)}h · {formatDateShort(record.studied_on)}
                   </Text>
+                  <RowMenuButton
+                    compact
+                    accessibilityLabel={`Session, more options`}
+                    onPress={() => sessionActions(record.id)}
+                  />
                 </View>
                 {record.takeaway ? (
                   <Text
@@ -421,6 +464,7 @@ export default function Learning() {
         tag="Study"
         onClose={() => setPlanOpen(false)}
       />
+      {sheet}
     </Screen>
   )
 }

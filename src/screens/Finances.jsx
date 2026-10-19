@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { PencilSimple, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
+import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import BudgetForm from '../components/forms/BudgetForm.jsx'
 import TxForm from '../components/forms/TxForm.jsx'
@@ -12,7 +14,8 @@ import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
-import { recordActions } from '../lib/alerts.js'
+import { confirmDelete } from '../lib/alerts.js'
+import { useRowActions } from '../lib/rowActions.jsx'
 import {
   budgetProgress,
   formatDateShort,
@@ -31,9 +34,15 @@ export default function Finances() {
   const [txRecord, setTxRecord] = useState(null)
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [budgetRecord, setBudgetRecord] = useState(null)
+  const { open, sheet } = useRowActions()
 
   const openNewTx = () => {
     setTxRecord(null)
+    setTxOpen(true)
+  }
+
+  const openEditTx = (tx) => {
+    setTxRecord(tx)
     setTxOpen(true)
   }
 
@@ -42,24 +51,41 @@ export default function Finances() {
     setBudgetOpen(true)
   }
 
+  const openEditBudget = (row) => {
+    setBudgetRecord({ id: row.id, category: row.category, limit_amount: row.limit })
+    setBudgetOpen(true)
+  }
+
   const txActions = (tx) =>
-    recordActions({
+    open({
       title: tx.merchant,
-      onEdit: () => {
-        setTxRecord(tx)
-        setTxOpen(true)
-      },
-      onDelete: () => deleteTransaction(tx.id).catch(() => {}),
+      subtitle: `${tx.category} · ${formatDateShort(tx.occurred_on)}`,
+      actions: [
+        { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditTx(tx) },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: Trash,
+          destructive: true,
+          onPress: () => confirmDelete(tx.merchant, () => deleteTransaction(tx.id).catch(() => {})),
+        },
+      ],
     })
 
   const budgetActions = (row) =>
-    recordActions({
+    open({
       title: row.category,
-      onEdit: () => {
-        setBudgetRecord({ id: row.id, category: row.category, limit_amount: row.limit })
-        setBudgetOpen(true)
-      },
-      onDelete: () => deleteBudget(row.id).catch(() => {}),
+      subtitle: 'Monthly budget',
+      actions: [
+        { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditBudget(row) },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: Trash,
+          destructive: true,
+          onPress: () => confirmDelete(row.category, () => deleteBudget(row.id).catch(() => {})),
+        },
+      ],
     })
 
   if (loading) {
@@ -116,14 +142,20 @@ export default function Finances() {
           {budgetRows.length ? (
             <View style={{ gap: 14 }}>
               {budgetRows.map((budget) => (
-                <Pressable
-                  key={budget.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${budget.category} budget, long press to edit`}
-                  onLongPress={() => budgetActions(budget)}
-                >
-                  <ProgressBar label={budget.category} value={budget.spent} limit={budget.limit} />
-                </Pressable>
+                <View key={budget.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${budget.category} budget`}
+                    onPress={() => openEditBudget(budget)}
+                    style={{ flex: 1 }}
+                  >
+                    <ProgressBar label={budget.category} value={budget.spent} limit={budget.limit} />
+                  </Pressable>
+                  <RowMenuButton
+                    accessibilityLabel={`${budget.category} budget, more options`}
+                    onPress={() => budgetActions(budget)}
+                  />
+                </View>
               ))}
             </View>
           ) : (
@@ -169,13 +201,14 @@ export default function Finances() {
                 <Pressable
                   key={tx.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`${tx.merchant}, long press to edit`}
-                  onLongPress={() => txActions(tx)}
+                  accessibilityLabel={`${tx.merchant}`}
+                  onPress={() => openEditTx(tx)}
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 12,
-                    paddingHorizontal: 16,
+                    paddingLeft: 16,
+                    paddingRight: 8,
                     paddingVertical: 12,
                     borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                     borderTopColor: c.line,
@@ -207,6 +240,10 @@ export default function Finances() {
                     {positive ? '+' : '−'}
                     {money(tx.amount, 2)}
                   </Text>
+                  <RowMenuButton
+                    accessibilityLabel={`${tx.merchant}, more options`}
+                    onPress={() => txActions(tx)}
+                  />
                 </Pressable>
               )
             })
@@ -240,6 +277,7 @@ export default function Finances() {
           setBudgetRecord(null)
         }}
       />
+      {sheet}
     </Screen>
   )
 }

@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { PencilSimple, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
+import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
-import { recordActions } from '../lib/alerts.js'
+import { confirmDelete } from '../lib/alerts.js'
+import { useRowActions } from '../lib/rowActions.jsx'
 import {
   formatDateShort,
   plannerWeek,
@@ -25,6 +28,7 @@ export default function Planner() {
   const [formOpen, setFormOpen] = useState(false)
   const [draftDate, setDraftDate] = useState(null)
   const [record, setRecord] = useState(null)
+  const { open, sheet } = useRowActions()
 
   const openForm = (date) => {
     setRecord(null)
@@ -32,17 +36,30 @@ export default function Planner() {
     setFormOpen(true)
   }
 
+  const openEditEntry = (entry) => {
+    setRecord(entry)
+    setDraftDate(null)
+    setFormOpen(true)
+  }
+
   const entryActions = (id) => {
     const entry = data.planner.find((item) => item.id === id)
     if (!entry) return
-    recordActions({
+    open({
       title: entry.title,
-      onEdit: () => {
-        setRecord(entry)
-        setDraftDate(null)
-        setFormOpen(true)
-      },
-      onDelete: () => deletePlanEntry(id).catch(() => {}),
+      subtitle: `${formatDateShort(entry.entry_date)}${
+        entry.start_time ? ` · ${String(entry.start_time).slice(0, 5)}` : ''
+      }`,
+      actions: [
+        { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditEntry(entry) },
+        {
+          key: 'delete',
+          label: 'Delete',
+          icon: Trash,
+          destructive: true,
+          onPress: () => confirmDelete(entry.title, () => deletePlanEntry(id).catch(() => {})),
+        },
+      ],
     })
   }
 
@@ -122,8 +139,8 @@ export default function Planner() {
                       <Pressable
                         key={event.id}
                         accessibilityRole="button"
-                        accessibilityLabel={`${event.title}, long press to edit`}
-                        onLongPress={() => entryActions(event.id)}
+                        accessibilityLabel={`${event.title}, tap for options`}
+                        onPress={() => entryActions(event.id)}
                         style={{ gap: 1 }}
                       >
                         <Text
@@ -168,14 +185,15 @@ export default function Planner() {
               <Pressable
                 key={entry.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${entry.title}, long press to edit`}
-                onLongPress={() => entryActions(entry.id)}
+                accessibilityLabel={entry.title}
+                onPress={() => openEditEntry(entry)}
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 12,
-                  paddingHorizontal: 16,
+                  paddingLeft: 16,
+                  paddingRight: 8,
                   paddingVertical: 14,
                   borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
                   borderTopColor: c.line,
@@ -198,6 +216,10 @@ export default function Planner() {
                 >
                   {formatDateShort(entry.entry_date)}
                 </Text>
+                <RowMenuButton
+                  accessibilityLabel={`${entry.title}, more options`}
+                  onPress={() => entryActions(entry.id)}
+                />
               </Pressable>
             ))
           ) : (
@@ -224,6 +246,7 @@ export default function Planner() {
           setRecord(null)
         }}
       />
+      {sheet}
     </Screen>
   )
 }
