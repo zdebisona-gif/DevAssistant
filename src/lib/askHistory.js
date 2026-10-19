@@ -24,3 +24,11 @@ export async function pushAskHistory(question, current) {
   }
   return next
 }
+
+export async function clearAskHistory() {
+  try {
+    await AsyncStorage.removeItem(KEY)
+  } catch {
+    /* ignore */
+  }
+}

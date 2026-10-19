@@ -69,15 +69,18 @@ not truthfully copy this cross-record grounding.
   account, so usage cannot incur charges. Settings shows the remaining requests for the day.
 - A note can be summarized with Gemini only when Zane explicitly taps "Summarize with Gemini" in
   the note viewer; the chatbot never sends note bodies on its own.
-- Ask Zen-I can also act: commands like "spent 12.50 on coffee", "spent 100 on jollibee using
-  gcash", "juan owes me 500", "settle the juan debt" or "add 500 to gcash" are parsed (on-device
-  first, Gemini fallback when AI is on) into a single whitelisted action — log or change a
-  transaction, budget, plan entry, note, course lesson, project, account balance or debt. A spend
-  command names the merchant, amount, date, category and the account it came from in one go. Every
-  write shows a confirmation card with the exact change before it runs, and deletes are flagged as
-  irreversible. Targets for edits and deletes are matched against rows already in memory, so record
-  titles and ids are never sent to Gemini (account names are sent so an account can be recognised in
-  the phrasing).
+- Ask Zen-I can also act: commands like "I paid 100 in jollibee using my cash", "bought groceries 250
+  with bdo", "grab 220", "juan owes me 500", "settle the juan debt" or "add 500 to gcash" are parsed
+  (on-device first, Gemini fallback when AI is on) into a single whitelisted action — log or change a
+  transaction, budget, plan entry, note, course lesson, project, account balance or debt. Logging is
+  phrased the way people actually talk: the amount can sit anywhere in the sentence, the store is the
+  merchant, and the funding source after using/with/from/in becomes the account (kept as free text
+  when it isn't a saved one). Bare shorthand like "grab 220" or "coffee 50" logs only when the words
+  clearly read as spending (a ₱/pesos marker or a known merchant), so questions are never mistaken
+  for commands. Every write shows a confirmation card with the exact change before it runs, and
+  deletes are flagged as irreversible. Targets for edits and deletes are matched against rows already
+  in memory, so record titles and ids are never sent to Gemini (account names are sent so an account
+  can be recognised in the phrasing).
 - "Plan with AI" is a shared capability, not a Learning-only feature: one sheet with a General or
   Study scope (the scope toggle appears only when a course exists), a horizon of Today / This week /
   Next 7 days, and an optional goal. Study scope falls back to a deterministic local plan when AI is
@@ -123,6 +126,13 @@ not truthfully copy this cross-record grounding.
   security. Spending, budgets and transaction amounts stay visible. While it is on, the hidden
   figures are also left out of the context sent to Gemini and out of local answers. Note that manual
   accounts and debts are not secret within the app itself.
+- Settings has a "Danger zone" that deletes every record in the account at once — notes,
+  transactions, budgets, accounts, debts, plan entries, courses, lessons, study sessions and
+  projects. It is irreversible and guarded by typing DELETE, and it runs as one server-side
+  `delete_all_data()` call scoped to the signed-in account, so it can never touch another one or
+  the shared AI-cap ledger. It also clears the on-device ask history and any running focus timer,
+  but leaves the sign-in and app settings intact — useful for wiping out testing data before
+  launch without starting over.
 - Built as a cross-platform Expo/React Native app (iOS and Android, plus an incidental web
   build), but Android is the design authority for UI decisions.
 - Named "Zen-I Assistant"; app scheme `zeni`.

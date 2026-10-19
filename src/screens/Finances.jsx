@@ -15,6 +15,7 @@ import ErrorState from '../components/ui/ErrorState.jsx'
 import HideToggle from '../components/ui/HideToggle.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
+import QuickAsk from '../components/ui/QuickAsk.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import AccountCard from '../components/ui/AccountCard.jsx'
@@ -281,6 +282,7 @@ export default function Finances() {
 
   return (
     <Screen title="Money" subtitle="This month · all accounts" right={<HideToggle />}>
+      <QuickAsk />
       <Section
         title="Accounts"
         action={

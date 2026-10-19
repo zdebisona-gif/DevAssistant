@@ -124,16 +124,16 @@ function timeFrom(raw) {
 }
 
 const CATEGORY_HINTS = [
-  ['Groceries', /grocer|supermarket|market|milk|egg|bread|puregold|sm hyper/],
+  ['Groceries', /grocer|supermarket|market|palengke|milk|egg|bread|rice|puregold|sm hyper|robinsons|landers|s&r|wet market/],
   [
     'Food & Dining',
-    /coffee|restaurant|lunch|dinner|breakfast|food|eat|cafe|pizza|snack|jollibee|jolibee|mcdo|mcdonald|chowking|greenwich|jabee|shakey/,
+    /coffee|restaurant|lunch|dinner|breakfast|merienda|food|eat|meal|cafe|pizza|snack|burger|jollibee|jolibee|mcdo|mcdonald|chowking|greenwich|jabee|shakey|kfc|wendy|mang inasal|inasal|foodpanda|grabfood|tokyo|samgyup|samgyeop|boba|milk tea|donut|dunkin|cinnabon|kanto|bulalo|silog|carenderia|carinderia/,
   ],
-  ['Transport', /uber|grab|angkas|joyride|taxi|bus|train|fare|fuel|gas|petrol|parking/],
-  ['Bills & Utilities', /bill|electric|water|internet|phone|rent|utilit|wifi|meralco|pldt|globe|smart/],
-  ['Shopping', /shop|clothes|shoes|amazon|store|lazada|shopee|zalora/],
-  ['Entertainment', /movie|cinema|netflix|game|concert|spotify/],
-  ['Salary', /salary|paycheck|wage|income/],
+  ['Transport', /uber|grab|angkas|joyride|taxi|bus|train|lrt|mrt|jeep|jeepney|tricycle|trike|fare|fuel|gas|petrol|diesel|parking|toll|move it|moveit/],
+  ['Bills & Utilities', /bill|electric|water|internet|phone|load|rent|utilit|wifi|meralco|maynilad|pldt|globe|smart|converge|pldc|postpaid|prepaid|subscription|insurance/],
+  ['Shopping', /shop|shirt|clothes|shoes|amazon|store|lazada|shopee|zalora|electronics|gadget|phone case|uniqlo|decathlon|daiso|mr diy/],
+  ['Entertainment', /movie|cinema|netflix|game|gaming|concert|spotify|steam|youtube|disney|ticket|bar|coffee date|videoke|karaoke/],
+  ['Salary', /salary|paycheck|payroll|wage|income|sweldo|allowance|remittance/],
 ]
 
 function categoryHint(text) {
@@ -196,12 +196,19 @@ function resolveTarget(rows, query, labelOf) {
 }
 
 /* An account name is optional metadata on a transaction, so an ambiguous or unknown name
-   falls back to free text instead of failing the whole action. */
+   falls back to free text instead of failing the whole action. Matching is word-bounded so
+   "cash" never resolves to an account named "GCash". */
 function bestAccount(data, query) {
-  const raw = String(query || '').trim()
-  if (!raw) return null
-  const found = resolveTarget(accountsFor(data), raw, (row) => row.name)
-  return found.ok ? found.row : null
+  const raw = String(query || '').trim().replace(/^(?:my|the)\s+/i, '')
+  const q = normalize(raw)
+  if (!q) return null
+  const rows = accountsFor(data)
+  const exact = rows.find((row) => normalize(row.name) === q)
+  if (exact) return exact
+  if (q.length < 4) return null
+  const word = new RegExp(`\\b${escapeRegExp(q)}\\b`)
+  const hits = rows.filter((row) => word.test(normalize(row.name)))
+  return hits.length === 1 ? hits[0] : null
 }
 
 /** "jollibee using gcash" → { merchant: 'Jollibee', account: <row|null> }. */
@@ -214,6 +221,143 @@ function splitAccount(text, data) {
   const account = bestAccount(data, match[1])
   if (!account) return { text: raw, account: null }
   return { text: raw.slice(0, match.index).trim(), account }
+}
+
+/* ------------------------------------------------------------------ */
+/* Money sentence parsing                                              */
+/*                                                                     */
+/* A single flexible pass for everyday logging phrases:               */
+/*   "I paid 100 in jollibee using my cash"                           */
+/*   "bought groceries 250 using bdo"                                 */
+/*   "grab 220" / "coffee 50" / "salary 20000"                        */
+/* The amount may sit anywhere; the account phrase is always removed  */
+/* from the merchant, even when no saved account matches.             */
+/* ------------------------------------------------------------------ */
+
+const TIME_RE = /\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bat\s+\d{1,2}:\d{2}\b/gi
+
+const EXPENSE_VERB_RE = /\b(?:spent|spend|paid|pay|bought|buy|purchased|purchase|ordered|grabbed|used|got)\b/i
+const INCOME_VERB_RE = /\b(?:earned|earn|received|receive|credited|salary|income|got\s+paid|was\s+paid|paid\s+me)\b/i
+
+/* Words stripped from the merchant remainder: verbs, pronouns and connectors.
+   "grab" is deliberately kept — it is usually the merchant (Grab). */
+const MERCHANT_NOISE_RE =
+  /\b(?:i|my|the|a|an|spent|spend|paid|pay|bought|buy|purchased|purchase|ordered|order|grabbed|used|use|got|was|were|earned|earn|received|receive|credited|salary|income|for|on|at|to|from|in|of|using|with|via|through|today|tonight|yesterday|last|night|morning|afternoon|evening|this)\b/gi
+
+const RESERVED_LEAD_RE =
+  /^(?:budget|note|plan|project|add|set|delete|remove|trash|remind|schedule|settle|clear|deposit|withdraw|subtract|deduct|top\s?up|log|record)\b/i
+
+const CURRENCY_MARK_RE = /(?:₱|\$|€|£)|\b(?:php|pesos?)\b|\d\s*p\b/i
+
+const ACCOUNT_KEYWORDS_RE =
+  /\b(?:cash|gcash|g-?cash|maya|paymaya|grabpay|card|credit\s+card|debit\s+card|wallet|bdo|bpi|unionbank|metrobank|landbank|security\s+bank|rcbc|chinabank|coins?|bank|paypal|gotyme|seabank)/i
+
+const ACCOUNT_PHRASE_RE =
+  /\b(?:using|with|via|through|from|paid\s+with|in)\s+(?:my\s+|the\s+)?([a-z0-9-]+(?:\s+(?!(?:using|with|via|through|from|in|paid|my|the)\b)[a-z0-9-]+){0,2})/gi
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function removeRange(text, index, length) {
+  return `${text.slice(0, index)} ${text.slice(index + length)}`.replace(/\s+/g, ' ').trim()
+}
+
+/* The first number that reads as money: currency-marked wins, else a standalone number.
+   Times are removed by the caller first, and ISO/clock digits never match the bare form. */
+function takeAmount(text) {
+  const marked = text.match(
+    /(?:₱|\$|€|£)\s*\d[\d,]*(?:\.\d{1,2})?|\d[\d,]*(?:\.\d{1,2})?\s*(?:pesos?|php|p(?![a-z0-9]))|\b(?:php|pesos?)\s*\d[\d,]*(?:\.\d{1,2})?/i,
+  )
+  if (marked) {
+    const value = amountFrom(marked[0].replace(/[^\d.,]/g, ''))
+    if (value) return { value, text: marked[0], index: marked.index }
+  }
+  const bare = text.match(/(?:^|\s)(\d[\d,]*(?:\.\d{1,2})?)(?=\s|$)/)
+  if (bare) {
+    const value = amountFrom(bare[1])
+    if (value) return { value, text: bare[1], index: bare.index + bare[0].length - bare[1].length }
+  }
+  return null
+}
+
+/* A saved account name beats a keyword; either way the phrase leaves the merchant. */
+function takeAccount(text, data) {
+  let best = null
+  for (const row of accountsFor(data)) {
+    const name = String(row.name || '').trim()
+    if (name.length < 2) continue
+    const match = text.match(new RegExp(`\\b${escapeRegExp(name)}\\b`, 'i'))
+    if (match && (!best || match[0].length > best.length)) {
+      best = { row, index: match.index, length: match[0].length }
+    }
+  }
+  if (best) return { account: best.row, text: removeRange(text, best.index, best.length) }
+
+  for (const match of text.matchAll(ACCOUNT_PHRASE_RE)) {
+    const words = match[1].trim()
+    if (ACCOUNT_KEYWORDS_RE.test(words)) {
+      return { accountName: words, text: removeRange(text, match.index, match[0].length) }
+    }
+  }
+  return { account: null, text }
+}
+
+function takeDate(text) {
+  if (/\byesterday\b/i.test(text)) return dateFrom('yesterday')
+  if (/\b\d{4}-\d{2}-\d{2}\b/.test(text)) return text.match(/\b\d{4}-\d{2}-\d{2}\b/)[0]
+  if (/\b(?:today|tonight)\b|\blast\s+night\b|\bthis\s+(?:morning|afternoon|evening)\b/i.test(text)) {
+    return dateFrom('today')
+  }
+  return null
+}
+
+function cleanMerchantText(text) {
+  return String(text || '')
+    .replace(MERCHANT_NOISE_RE, ' ')
+    .replace(/[^\w\s&.'-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function parseMoney(raw, data) {
+  const text = String(raw || '').trim()
+  if (!text || /\?$/.test(text)) return null
+
+  const working = text.replace(TIME_RE, ' ')
+  const amount = takeAmount(working)
+  if (!amount) return null
+
+  let rest = removeRange(working, amount.index, amount.text.length)
+  const accountResult = takeAccount(rest, data)
+  rest = accountResult.text
+  const date = takeDate(rest)
+
+  const income = INCOME_VERB_RE.test(text)
+  const expense = EXPENSE_VERB_RE.test(text)
+  const merchant = cleanMerchantText(rest)
+  const hinted = categoryHint(`${merchant} ${text}`)
+
+  if (!income && !expense) {
+    /* No verb: only log when the sentence clearly reads as spending. */
+    if (RESERVED_LEAD_RE.test(text)) return null
+    if (!CURRENCY_MARK_RE.test(text) && !hinted) return null
+  }
+  if (!merchant && !income) return null
+
+  return buildProposal(
+    'create_transaction',
+    {
+      amount: amount.value,
+      merchant: merchant || (income ? 'Income' : 'Expense'),
+      type: income ? 'income' : 'expense',
+      category: hinted || undefined,
+      account: accountResult.account?.name ?? accountResult.accountName ?? undefined,
+      account_id: accountResult.account?.id ?? null,
+      date,
+    },
+    data,
+  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -690,8 +834,6 @@ export function buildProposal(action, args, data) {
 /* Local parsing                                                       */
 /* ------------------------------------------------------------------ */
 
-const SPEND_RE = /^(?:i\s+)?(?:spent|paid|bought)\s+(?:[$£€₱]\s*)?([\d.,]+)\s*(?:on|for|at)\s+(.+)$/i
-const INCOME_RE = /^(?:i\s+)?(?:earned|received|got paid|was paid|got)\s+(?:[$£€₱]\s*)?([\d.,]+)\s*(?:from|for|on)?\s*(.*)$/i
 const ADD_TX_RE = /^(?:add|log|record)\s+(?:an?\s+)?(?:expense|transaction|purchase|income)\s+(?:of\s+)?(?:[$£€₱]\s*)?([\d.,]+)\s*(?:on|for|at|to)?\s*(.*)$/i
 
 const BUDGET_RE = /^(?:set|add|create)\s+(?:a\s+)?budget\s+(?:of\s+)?(?:[$£€₱]\s*)?([\d.,]+)\s+(?:for|on)\s+(.+)$/i
@@ -838,7 +980,7 @@ export function parseLocalAction(text, data) {
     )
   }
 
-  match = value.match(SPEND_RE) || value.match(ADD_TX_RE)
+  match = value.match(ADD_TX_RE)
   if (match) {
     const income = /income/i.test(value)
     const { text: merchant, account } = splitAccount(cleanMerchant(match[2]), data)
@@ -846,7 +988,7 @@ export function parseLocalAction(text, data) {
       'create_transaction',
       {
         amount: amountFrom(match[1]),
-        merchant: merchant || 'Income',
+        merchant: merchant || (income ? 'Income' : 'Expense'),
         type: income ? 'income' : 'expense',
         account: account?.name,
         account_id: account?.id,
@@ -855,15 +997,8 @@ export function parseLocalAction(text, data) {
     )
   }
 
-  match = value.match(INCOME_RE)
-  if (match) {
-    const { text: merchant, account } = splitAccount(cleanMerchant(match[2]), data)
-    return buildProposal(
-      'create_transaction',
-      { amount: amountFrom(match[1]), merchant: merchant || 'Income', type: 'income', account: account?.name, account_id: account?.id },
-      data,
-    )
-  }
+  const money = parseMoney(value, data)
+  if (money) return money
 
   return null
 }

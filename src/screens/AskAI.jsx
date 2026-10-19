@@ -398,8 +398,9 @@ export default function AskAI() {
                   What should we look at?
                 </Text>
                 <Text style={{ fontFamily: fonts.sans, fontSize: text.label, lineHeight: 20, color: c.mutedForeground }}>
-                  Ask about a period, a category or a goal — or tell me to log something, like
-                  “spent 12.50 on coffee”. Answers come back as numbers, not paragraphs.
+                  Ask about a period, a category or a goal — or just tell me what you spent, like
+                  “I paid 100 in jollibee using my cash”, “grab 220” or “earned 5000”. I'll log it
+                  for you to confirm.
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

@@ -171,6 +171,8 @@ export function DataProvider({ children }) {
           db.updateDebt(id, { settled, settled_at: settled ? new Date().toISOString() : null }),
         ),
       createPenalty: (row) => mutate(() => db.addPenalty(row)),
+      /* Irreversible: removes every record for this account, then reloads to empty. */
+      deleteAllData: () => mutate(() => db.deleteAllData()),
       atonePenalty: (penalty) =>
         mutate(async () => {
           await db.updatePenalty(penalty.id, {

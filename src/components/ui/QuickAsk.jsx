@@ -45,7 +45,7 @@ export default function QuickAsk() {
           onChangeText={setValue}
           onSubmitEditing={() => submit(value)}
           returnKeyType="send"
-          placeholder="Ask Zen-I about your money, notes, plans or study"
+          placeholder="Log or ask — e.g. “paid 100 in jollibee using cash”"
           placeholderTextColor={c.mutedForeground}
           accessibilityLabel="Ask Zen-I"
           style={{

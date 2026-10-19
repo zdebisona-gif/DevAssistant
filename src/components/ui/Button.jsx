@@ -24,6 +24,7 @@ export default function Button({
   const palette = {
     primary: { bg: c.primary, border: 'transparent', text: c.onPrimary },
     secondary: { bg: c.card, border: c.border, text: c.foreground },
+    destructive: { bg: c.destructive, border: 'transparent', text: c.onPrimary },
     ghost: { bg: 'transparent', border: 'transparent', text: c.mutedForeground },
   }[variant]
 

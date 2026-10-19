@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { CaretRight, Database, Info, LockKey, SignOut, Sparkle } from '../icons.js'
+import { CaretRight, Database, Info, LockKey, SignOut, Sparkle, Trash } from '../icons.js'
 import { Alert, Pressable, Switch, Text, View } from 'react-native'
 import ChangePasswordForm from '../components/forms/ChangePasswordForm.jsx'
+import DeleteDataForm from '../components/forms/DeleteDataForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import { Card, CardBody, CardHeader } from '../components/ui/Card.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
@@ -73,6 +74,8 @@ export default function Settings() {
   const router = useRouter()
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [passwordChanged, setPasswordChanged] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [dataDeleted, setDataDeleted] = useState(false)
 
   const remaining = remainingToday(usage)
   const cap = usage?.cap ?? 50
@@ -91,6 +94,12 @@ export default function Settings() {
     Haptics.selectionAsync().catch(() => {})
     setPasswordChanged(false)
     setPasswordOpen(true)
+  }
+
+  const openDelete = () => {
+    Haptics.selectionAsync().catch(() => {})
+    setDataDeleted(false)
+    setDeleteOpen(true)
   }
 
   const confirmSignOut = () => {
@@ -276,6 +285,32 @@ export default function Settings() {
       </Card>
 
       <Card>
+        <CardHeader title="Danger zone" subtitle="Permanent and account-wide" />
+        <CardBody style={{ gap: 8 }}>
+          {dataDeleted ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.success }}
+            >
+              All records deleted. Your account is empty again.
+            </Text>
+          ) : (
+            <Text
+              style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+            >
+              Removes every note, transaction, budget, account, debt, plan entry, course, lesson,
+              study session and project in this account. Your sign-in and app settings stay.
+            </Text>
+          )}
+        </CardBody>
+        <Row
+          label="Delete all data"
+          onPress={openDelete}
+          right={<Trash size={14} weight="bold" color={c.destructive} />}
+        />
+      </Card>
+
+      <Card>
         <CardHeader title="About" subtitle="Zen-I Assistant" />
         <CardBody>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -298,6 +333,14 @@ export default function Settings() {
         onClose={(changed) => {
           setPasswordOpen(false)
           if (changed === true) setPasswordChanged(true)
+        }}
+      />
+
+      <DeleteDataForm
+        visible={deleteOpen}
+        onClose={(deleted) => {
+          setDeleteOpen(false)
+          if (deleted === true) setDataDeleted(true)
         }}
       />
     </Screen>

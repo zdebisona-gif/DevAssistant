@@ -117,3 +117,9 @@ export const deleteAccount = (id) => remove('accounts', id)
 export const addDebt = (row) => insert('debts', row)
 export const updateDebt = (id, patch) => update('debts', id, patch)
 export const deleteDebt = (id) => remove('debts', id)
+
+/** Wipe every record the signed-in account owns. Scoped server-side by auth.uid(). */
+export async function deleteAllData() {
+  const { error } = await supabase.rpc('delete_all_data')
+  if (error) throw error
+}
