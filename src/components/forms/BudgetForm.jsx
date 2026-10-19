@@ -7,6 +7,7 @@ import TagPicker from '../ui/TagPicker.jsx'
 import { MONEY_CATEGORIES } from '../../data/constants.js'
 import { useData } from '../../data/store.jsx'
 import { todayISO } from '../../lib/analytics.js'
+import { validateBudget } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 function currentPeriod() {
@@ -30,16 +31,16 @@ export default function BudgetForm({ visible, onClose, record }) {
     setSaving(false)
   }, [visible, record])
 
-  const parsed = Number.parseFloat(limit)
-  const valid = Number.isFinite(parsed) && parsed > 0
+  const result = validateBudget({ category, limit, period: editing ? undefined : currentPeriod() })
+  const valid = result.ok
 
   const submit = async () => {
     if (!valid || saving) return
     setSaving(true)
     setError(null)
     try {
-      if (editing) await updateBudget(record.id, { category, limit_amount: parsed })
-      else await createBudget({ category, limit_amount: parsed, period: currentPeriod() })
+      if (editing) await updateBudget(record.id, result.payload)
+      else await createBudget(result.payload)
       onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the budget.')

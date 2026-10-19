@@ -14,15 +14,17 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Screen from '../components/layout/Screen.jsx'
+import ActionConfirm from '../components/assistant/ActionConfirm.jsx'
 import Button from '../components/ui/Button.jsx'
 import Chip from '../components/ui/Chip.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
 import { useData } from '../data/store.jsx'
 import { useAiPrefs } from '../data/aiPrefs.jsx'
 import { answerQuery, deriveSuggestions } from '../lib/ask.js'
+import { buildActionContext, buildExtractedProposal, looksLikeCommand, parseLocalAction, runAction } from '../lib/actions.js'
 import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
 import { buildContextFor } from '../lib/context.js'
-import { askGemini, describeGeminiError, inCooldown } from '../lib/gemini.js'
+import { askGemini, describeGeminiError, extractAction, inCooldown } from '../lib/gemini.js'
 import { classifyIntent } from '../lib/intent.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
@@ -189,7 +191,8 @@ function ThinkingBubble() {
 export default function AskAI() {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
-  const { data } = useData()
+  const services = useData()
+  const { data } = services
   const { enabled: aiEnabled, recordUsage } = useAiPrefs()
   const { q } = useLocalSearchParams()
   const [messages, setMessages] = useState([])
@@ -215,10 +218,48 @@ export default function AskAI() {
     pushAskHistory(value, history).then(setHistory)
 
     const local = answerQuery(value, data)
-    const intent = classifyIntent(value)
     const reply = { ...local, label: 'Local answer' }
 
-    if (intent.kind === 'ai' && aiEnabled && !inCooldown()) {
+    let outcome = parseLocalAction(value, data)
+    let triedAction = false
+
+    if (!outcome && looksLikeCommand(value) && aiEnabled && !inCooldown()) {
+      triedAction = true
+      try {
+        const extracted = await extractAction({ text: value, context: buildActionContext() })
+        recordUsage({ remaining: extracted.remaining, cap: extracted.cap, model: extracted.model })
+        outcome = extracted.action === 'none' ? null : buildExtractedProposal(extracted, data)
+      } catch {
+        outcome = null
+      }
+    }
+
+    if (outcome?.ok) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `a${stamp}`,
+          role: 'assistant',
+          kind: 'action',
+          proposal: outcome.proposal,
+          actionState: 'idle',
+        },
+      ])
+      setPending(false)
+      return
+    }
+
+    if (outcome && !outcome.ok) {
+      reply.answer = outcome.error
+      reply.note = 'Nothing was changed.'
+      setMessages((prev) => [...prev, { id: `a${stamp}`, role: 'assistant', ...reply }])
+      setPending(false)
+      return
+    }
+
+    const intent = classifyIntent(value)
+
+    if (intent.kind === 'ai' && aiEnabled && !inCooldown() && !triedAction) {
       try {
         const { context, sources } = buildContextFor(intent.domain, data)
         const { text: aiText, model, remaining, cap } = await askGemini({
@@ -244,6 +285,26 @@ export default function AskAI() {
     setMessages((prev) => [...prev, { id: `a${stamp}`, role: 'assistant', ...reply }])
     setPending(false)
   }
+
+  const updateMessage = (id, patch) =>
+    setMessages((prev) => prev.map((message) => (message.id === id ? { ...message, ...patch } : message)))
+
+  const confirmAction = async (id) => {
+    const message = messages.find((entry) => entry.id === id)
+    if (!message?.proposal) return
+    updateMessage(id, { actionState: 'running', actionError: null })
+    try {
+      await runAction(services, message.proposal)
+      updateMessage(id, { actionState: 'done', actionError: null })
+    } catch (error) {
+      updateMessage(id, {
+        actionState: 'error',
+        actionError: error?.message || 'Could not save the change.',
+      })
+    }
+  }
+
+  const cancelAction = (id) => updateMessage(id, { actionState: 'cancelled' })
 
   useEffect(() => {
     const seed = Array.isArray(q) ? q[0] : q
@@ -290,7 +351,8 @@ export default function AskAI() {
                   What should we look at?
                 </Text>
                 <Text style={{ fontFamily: fonts.sans, fontSize: text.label, lineHeight: 20, color: c.mutedForeground }}>
-                  Ask about a period, a category or a goal. Answers come back as numbers, not paragraphs.
+                  Ask about a period, a category or a goal — or tell me to log something, like
+                  “spent 12.50 on coffee”. Answers come back as numbers, not paragraphs.
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -328,6 +390,15 @@ export default function AskAI() {
           {messages.map((message) =>
             message.role === 'user' ? (
               <UserMessage key={message.id} text={message.text} />
+            ) : message.kind === 'action' ? (
+              <ActionConfirm
+                key={message.id}
+                proposal={message.proposal}
+                state={message.actionState}
+                error={message.actionError}
+                onConfirm={() => confirmAction(message.id)}
+                onCancel={() => cancelAction(message.id)}
+              />
             ) : (
               <AssistantMessage key={message.id} message={message} onFollowUp={ask} />
             ),

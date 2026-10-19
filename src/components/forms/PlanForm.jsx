@@ -9,6 +9,7 @@ import TimeField from '../ui/TimeField.jsx'
 import { PLAN_TAGS } from '../../data/constants.js'
 import { useData } from '../../data/store.jsx'
 import { todayISO } from '../../lib/analytics.js'
+import { validatePlanEntry } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 export default function PlanForm({ visible, onClose, date: initialDate, record, tag: initialTag }) {
@@ -32,22 +33,16 @@ export default function PlanForm({ visible, onClose, date: initialDate, record, 
     setSaving(false)
   }, [visible, record, initialDate, initialTag])
 
-  const valid = title.trim() && /^\d{4}-\d{2}-\d{2}$/.test(date)
-  const normalizedTime = /^\d{1,2}:\d{2}$/.test(time) ? `${time.padStart(5, '0')}:00` : null
+  const result = validatePlanEntry({ title, entry_date: date, time, tag })
+  const valid = result.ok
 
   const submit = async () => {
     if (!valid || saving) return
     setSaving(true)
     setError(null)
     try {
-      const payload = {
-        title: title.trim(),
-        entry_date: date,
-        start_time: normalizedTime,
-        tag,
-      }
-      if (editing) await updatePlanEntry(record.id, payload)
-      else await createPlanEntry(payload)
+      if (editing) await updatePlanEntry(record.id, result.payload)
+      else await createPlanEntry(result.payload)
       onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the entry.')

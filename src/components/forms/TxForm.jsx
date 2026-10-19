@@ -8,6 +8,7 @@ import TagPicker from '../ui/TagPicker.jsx'
 import { MONEY_CATEGORIES } from '../../data/constants.js'
 import { useData } from '../../data/store.jsx'
 import { todayISO } from '../../lib/analytics.js'
+import { validateTransaction } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 const KINDS = ['Expense', 'Income']
@@ -38,23 +39,23 @@ export default function TxForm({ visible, onClose, record }) {
     setSaving(false)
   }, [visible, record])
 
-  const parsed = Number.parseFloat(amount)
-  const valid = merchant.trim() && Number.isFinite(parsed) && parsed > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)
+  const result = validateTransaction({
+    type: kind === 'Income' ? 'income' : 'expense',
+    merchant,
+    amount,
+    category,
+    account,
+    occurred_on: date,
+  })
+  const valid = result.ok
 
   const submit = async () => {
     if (!valid || saving) return
     setSaving(true)
     setError(null)
     try {
-      const payload = {
-        merchant: merchant.trim(),
-        amount: kind === 'Expense' ? -Math.abs(parsed) : Math.abs(parsed),
-        category,
-        account: account.trim() || null,
-        occurred_on: date,
-      }
-      if (editing) await updateTransaction(record.id, payload)
-      else await createTransaction(payload)
+      if (editing) await updateTransaction(record.id, result.payload)
+      else await createTransaction(result.payload)
       onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the transaction.')

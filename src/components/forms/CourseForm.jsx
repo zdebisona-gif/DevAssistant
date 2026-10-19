@@ -4,6 +4,7 @@ import Button from '../ui/Button.jsx'
 import Field from '../ui/Field.jsx'
 import Sheet from '../ui/Sheet.jsx'
 import { useData } from '../../data/store.jsx'
+import { validateCourse } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 export default function CourseForm({ visible, onClose, record }) {
@@ -29,33 +30,22 @@ export default function CourseForm({ visible, onClose, record }) {
     setSaving(false)
   }, [visible, record])
 
-  const totalUnits = Number.parseInt(total, 10)
-  const completedUnits = completed ? Number.parseInt(completed, 10) : 0
-  const weeklyHours = weekly ? Number.parseFloat(weekly) : 0
-  const valid =
-    name.trim() &&
-    Number.isFinite(totalUnits) &&
-    totalUnits > 0 &&
-    Number.isFinite(completedUnits) &&
-    completedUnits >= 0 &&
-    completedUnits <= totalUnits &&
-    Number.isFinite(weeklyHours) &&
-    weeklyHours >= 0
+  const result = validateCourse({
+    name,
+    total_units: total,
+    completed_units: completed === '' ? 0 : completed,
+    next_label: next,
+    weekly_target_hours: weekly === '' ? 0 : weekly,
+  })
+  const valid = result.ok
 
   const submit = async () => {
     if (!valid || saving) return
     setSaving(true)
     setError(null)
     try {
-      const payload = {
-        name: name.trim(),
-        total_units: totalUnits,
-        completed_units: completedUnits,
-        next_label: next.trim() || null,
-        weekly_target_hours: weeklyHours || 0,
-      }
-      if (editing) await updateCourse(record.id, payload)
-      else await createCourse(payload)
+      if (editing) await updateCourse(record.id, result.payload)
+      else await createCourse(result.payload)
       onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the course.')

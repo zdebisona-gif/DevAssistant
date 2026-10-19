@@ -6,6 +6,7 @@ import Sheet from '../ui/Sheet.jsx'
 import TagPicker from '../ui/TagPicker.jsx'
 import { NOTE_TAGS } from '../../data/constants.js'
 import { useData } from '../../data/store.jsx'
+import { validateNote } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 export default function NoteForm({ visible, onClose, record }) {
@@ -27,14 +28,16 @@ export default function NoteForm({ visible, onClose, record }) {
     setSaving(false)
   }, [visible, record])
 
+  const result = validateNote({ title, body, tag })
+  const valid = result.ok
+
   const submit = async () => {
-    if (!title.trim() || saving) return
+    if (!valid || saving) return
     setSaving(true)
     setError(null)
     try {
-      const payload = { title: title.trim(), body: body.trim(), tag }
-      if (editing) await updateNote(record.id, payload)
-      else await createNote(payload)
+      if (editing) await updateNote(record.id, result.payload)
+      else await createNote(result.payload)
       onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the note.')
@@ -50,7 +53,7 @@ export default function NoteForm({ visible, onClose, record }) {
       {error ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
       ) : null}
-      <Button variant="primary" onPress={submit} loading={saving} disabled={!title.trim()}>
+      <Button variant="primary" onPress={submit} loading={saving} disabled={!valid}>
         {editing ? 'Save changes' : 'Save note'}
       </Button>
     </Sheet>

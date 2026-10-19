@@ -34,6 +34,57 @@ const MAX_QUESTION_CHARS = 500
 const MAX_CONTEXT_CHARS = 4000
 const MAX_OUTPUT_TOKENS = 400
 
+// Actions the assistant may *request*. Nothing else is accepted from the model.
+const ACTIONS = [
+  'create_transaction',
+  'update_transaction',
+  'delete_transaction',
+  'create_budget',
+  'update_budget',
+  'create_planner_event',
+  'update_planner_event',
+  'delete_planner_event',
+  'create_note',
+  'update_note',
+  'delete_note',
+] as const
+
+const ACTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    action: { type: 'string', enum: [...ACTIONS, 'none'] },
+    confidence: { type: 'string', enum: ['high', 'low'] },
+    args: {
+      type: 'object',
+      properties: {
+        target: { type: 'string' },
+        title: { type: 'string' },
+        body: { type: 'string' },
+        tag: { type: 'string' },
+        merchant: { type: 'string' },
+        amount: { type: 'number' },
+        type: { type: 'string', enum: ['expense', 'income'] },
+        category: { type: 'string' },
+        account: { type: 'string' },
+        date: { type: 'string' },
+        time: { type: 'string' },
+        limit: { type: 'number' },
+      },
+    },
+  },
+  required: ['action', 'confidence'],
+}
+
+const ACTION_RULES = [
+  'You turn one user message into at most one record action for a private personal app.',
+  `Allowed actions: ${ACTIONS.join(', ')}.`,
+  'Return action "none" when the message is a question, greeting, or not a request to change records.',
+  'For update/delete, put the phrase that identifies the existing item in args.target. Never invent ids.',
+  'For create/update, fill only the fields the user gave. Amounts are positive; use type "expense" unless income is implied.',
+  'Resolve relative dates to YYYY-MM-DD using the provided Today. Times are 24-hour "HH:MM".',
+  'Prefer the allowed categories and tags listed in the context. Return JSON only.',
+].join(' ')
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -55,6 +106,7 @@ const BASE_RULES = [
 ].join(' ')
 
 function systemFor(task: string) {
+  if (task === 'extract-action') return ACTION_RULES
   if (task === 'summarize-note') {
     return `${BASE_RULES} The user has explicitly asked you to summarize one note. Keep it to two sentences.`
   }
@@ -62,6 +114,31 @@ function systemFor(task: string) {
     return `${BASE_RULES} The user wants interpretation or a suggestion. Ground every point in the context and be concrete.`
   }
   return `${BASE_RULES} Explain or interpret the context to answer the question.`
+}
+
+function requestFor(task: string, question: string, context: string) {
+  if (task === 'extract-action') {
+    return {
+      systemInstruction: { parts: [{ text: ACTION_RULES }] },
+      contents: [{ role: 'user', parts: [{ text: `Message: ${question}\n\n${context}` }] }],
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 300,
+        responseMimeType: 'application/json',
+        responseSchema: ACTION_SCHEMA,
+      },
+    }
+  }
+
+  const userText = context
+    ? `Question: ${question}\n\nContext (the user's own records, already computed):\n${context}`
+    : `Question: ${question}\n\n(No records context was attached.)`
+
+  return {
+    systemInstruction: { parts: [{ text: systemFor(task) }] },
+    contents: [{ role: 'user', parts: [{ text: userText }] }],
+    generationConfig: { temperature: 0.4, maxOutputTokens: MAX_OUTPUT_TOKENS },
+  }
 }
 
 Deno.serve(async (req) => {
@@ -100,10 +177,6 @@ Deno.serve(async (req) => {
     return json({ error: 'daily-cap', cap: DAILY_CAP, remaining: 0 }, 429)
   }
 
-  const userText = context
-    ? `Question: ${question}\n\nContext (the user's own records, already computed):\n${context}`
-    : `Question: ${question}\n\n(No records context was attached.)`
-
   let upstream: Response
   try {
     upstream = await fetch(
@@ -111,11 +184,7 @@ Deno.serve(async (req) => {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemFor(task) }] },
-          contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: MAX_OUTPUT_TOKENS },
-        }),
+        body: JSON.stringify(requestFor(task, question, context)),
       },
     )
   } catch {
@@ -142,6 +211,28 @@ Deno.serve(async (req) => {
     .trim()
 
   if (!text) return json({ error: 'empty' }, 502)
+
+  if (task === 'extract-action') {
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return json({ error: 'bad-action' }, 502)
+    }
+    if (parsed?.action !== 'none' && !ACTIONS.includes(parsed?.action)) {
+      return json({ error: 'action-not-allowed' }, 400)
+    }
+    return json({
+      json: {
+        action: parsed?.action === 'none' ? 'none' : parsed.action,
+        confidence: parsed?.confidence === 'low' ? 'low' : 'high',
+        args: parsed?.args && typeof parsed.args === 'object' ? parsed.args : {},
+      },
+      model: MODEL,
+      remaining: Math.max(0, DAILY_CAP - used),
+      cap: DAILY_CAP,
+    })
+  }
 
   return json({ text, model: MODEL, remaining: Math.max(0, DAILY_CAP - used), cap: DAILY_CAP })
 })

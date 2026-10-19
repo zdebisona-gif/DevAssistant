@@ -64,6 +64,12 @@ not truthfully copy this cross-record grounding.
   account, so usage cannot incur charges. Settings shows the remaining requests for the day.
 - A note can be summarized with Gemini only when Zane explicitly taps "Summarize with Gemini" in
   the note viewer; the chatbot never sends note bodies on its own.
+- Ask Zen-I can also act: commands like "spent 12.50 on coffee" or "delete the note about milk"
+  are parsed (on-device first, Gemini fallback when AI is on) into a single whitelisted action —
+  log or change a transaction, budget, plan entry or note. Every write shows a confirmation card
+  with the exact change before it runs, and deletes are flagged as irreversible. Targets for edits
+  and deletes are matched against rows already in memory, so record titles and ids are never sent
+  to Gemini.
 - Learning is connected, not isolated: a focus timer records real sessions (persisted across
   restarts), sessions link to a course and capture a takeaway, today's Study-tagged planner blocks
   are startable from Learning, courses carry a weekly hour target, and saving a takeaway also

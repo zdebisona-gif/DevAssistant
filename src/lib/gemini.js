@@ -24,6 +24,10 @@ export function inCooldown() {
   return Date.now() < cooldownUntil
 }
 
+export function cooldownRemainingMs() {
+  return Math.max(0, cooldownUntil - Date.now())
+}
+
 /** Short, human reason for why Gemini was skipped or failed. */
 export function describeGeminiError(error) {
   switch (error?.kind) {
@@ -44,10 +48,6 @@ export function describeGeminiError(error) {
   }
 }
 
-export function cooldownRemainingMs() {
-  return Math.max(0, cooldownUntil - Date.now())
-}
-
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new GeminiUnavailable('timeout')), ms)
@@ -64,23 +64,12 @@ function withTimeout(promise, ms) {
   })
 }
 
-/**
- * @returns {Promise<{ text: string, model: string, remaining?: number }>}
- * @throws {GeminiUnavailable}
- */
-export async function askGemini({ task = 'explain', question, context = '' }) {
-  const q = String(question || '').trim()
-  if (!q) throw new GeminiUnavailable('bad-request')
+async function invokeProxy(body) {
   if (inCooldown()) throw new GeminiUnavailable('cooldown')
 
   let result
   try {
-    result = await withTimeout(
-      supabase.functions.invoke('gemini', {
-        body: { task, question: q.slice(0, 500), context: String(context || '').slice(0, 4000) },
-      }),
-      TIMEOUT_MS,
-    )
+    result = await withTimeout(supabase.functions.invoke('gemini', { body }), TIMEOUT_MS)
   } catch (error) {
     if (error instanceof GeminiUnavailable) throw error
     throw new GeminiUnavailable('network')
@@ -106,8 +95,54 @@ export async function askGemini({ task = 'explain', question, context = '' }) {
     throw new GeminiUnavailable('proxy', data.error)
   }
 
-  const text = String(data?.text || '').trim()
+  return data || {}
+}
+
+/**
+ * @returns {Promise<{ text: string, model: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function askGemini({ task = 'explain', question, context = '' }) {
+  const q = String(question || '').trim()
+  if (!q) throw new GeminiUnavailable('bad-request')
+
+  const data = await invokeProxy({
+    task,
+    question: q.slice(0, 500),
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const text = String(data.text || '').trim()
   if (!text) throw new GeminiUnavailable('empty')
 
-  return { text, model: data?.model || 'gemini', remaining: data?.remaining, cap: data?.cap }
+  return { text, model: data.model || 'gemini', remaining: data.remaining, cap: data.cap }
+}
+
+/**
+ * Ask the proxy to turn a message into one whitelisted action.
+ * Returns action 'none' when the message is not a record change.
+ * @returns {Promise<{ action: string, confidence: 'high'|'low', args: object }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function extractAction({ text, context = '' }) {
+  const q = String(text || '').trim()
+  if (!q) throw new GeminiUnavailable('bad-request')
+
+  const data = await invokeProxy({
+    task: 'extract-action',
+    question: q.slice(0, 500),
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const result = data.json
+  if (!result?.action) throw new GeminiUnavailable('empty')
+
+  return {
+    action: result.action,
+    confidence: result.confidence === 'low' ? 'low' : 'high',
+    args: result.args && typeof result.args === 'object' ? result.args : {},
+    model: data.model,
+    remaining: data.remaining,
+    cap: data.cap,
+  }
 }

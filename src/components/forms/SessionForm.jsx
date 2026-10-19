@@ -7,6 +7,7 @@ import Field from '../ui/Field.jsx'
 import Sheet from '../ui/Sheet.jsx'
 import { useData } from '../../data/store.jsx'
 import { todayISO } from '../../lib/analytics.js'
+import { validateSession } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 export default function SessionForm({ visible, onClose, record, defaults }) {
@@ -30,8 +31,8 @@ export default function SessionForm({ visible, onClose, record, defaults }) {
     setSaving(false)
   }, [visible, record, defaults])
 
-  const parsed = Number.parseFloat(hours)
-  const valid = Number.isFinite(parsed) && parsed > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)
+  const result = validateSession({ hours, studied_on: date, course_id: courseId, takeaway })
+  const valid = result.ok
   const courseName = data.courses.find((course) => course.id === courseId)?.name
 
   const submit = async () => {
@@ -39,16 +40,10 @@ export default function SessionForm({ visible, onClose, record, defaults }) {
     setSaving(true)
     setError(null)
     try {
-      const payload = {
-        studied_on: date,
-        hours: parsed,
-        course_id: courseId || null,
-        takeaway: takeaway.trim() || null,
-      }
       if (editing) {
-        await updateSession(record.id, payload)
+        await updateSession(record.id, result.payload)
       } else {
-        await createSession(payload)
+        await createSession(result.payload)
         if (takeaway.trim()) {
           await createNote({
             title: courseName ? `${courseName} — takeaway` : 'Study takeaway',
