@@ -1,4 +1,13 @@
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from '../../icons.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
@@ -10,6 +19,8 @@ import { useTheme } from '../../theme/ThemeProvider.jsx'
 export default function Sheet({ visible, onClose, title, subtitle, children }) {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
+  const { height: windowHeight } = useWindowDimensions()
+  const maxListHeight = Math.max(200, Math.round(windowHeight * 0.88 - insets.bottom - 150))
 
   return (
     <Modal
@@ -28,8 +39,7 @@ export default function Sheet({ visible, onClose, title, subtitle, children }) {
           onPress={onClose}
           style={{ flex: 1, backgroundColor: c.scrim }}
         />
-        <Pressable
-          onPress={() => {}}
+        <View
           style={{
             backgroundColor: c.card,
             borderTopLeftRadius: radius.lg,
@@ -77,12 +87,13 @@ export default function Sheet({ visible, onClose, title, subtitle, children }) {
           </View>
 
           <ScrollView
+            style={{ flexGrow: 0, maxHeight: maxListHeight }}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, gap: 16 }}
           >
             {children}
           </ScrollView>
-        </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   )
