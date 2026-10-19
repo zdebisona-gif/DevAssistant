@@ -34,7 +34,8 @@ not truthfully copy this cross-record grounding.
   tracking; replayable from Settings.
 - Light and dark appearance, following the device setting.
 - Four kinds of records drive everything: Finances (spending, budgets, transactions), Notes,
-  Planner (today and weekly schedule), and Learning (courses, streaks, study hours).
+  Planner (today and weekly schedule), and Learning (courses, streaks, study hours, a focus timer
+  and per-session takeaways). A fifth record type — weekly projects — is planned.
 - Records live in Supabase (Postgres). The UI shell was built first, reviewed, then wired to real
   data; sign-in is the remaining phase before the app is single-user-secure.
 
@@ -50,6 +51,10 @@ not truthfully copy this cross-record grounding.
 - Ask Zen-I is grounded: answers are computed from the user's records in `src/lib/ask.js` and
   return a written answer, a breakdown, an insight, follow-ups and a Sources line naming which
   records were read. No model is called.
+- Learning is connected, not isolated: a focus timer records real sessions (persisted across
+  restarts), sessions link to a course and capture a takeaway, today's Study-tagged planner blocks
+  are startable from Learning, courses carry a weekly hour target, and saving a takeaway also
+  writes a Study-tagged note.
 - Built as a cross-platform Expo/React Native app (iOS and Android, plus an incidental web
   build), but Android is the design authority for UI decisions.
 - Named "Zen-I Assistant"; app scheme `zeni`.
@@ -65,7 +70,8 @@ not truthfully copy this cross-record grounding.
 - Working UI implementation: screens in `src/screens/`, routing in `app/`, shared UI in
   `src/components/`, theme in `src/theme/`.
 - Supabase schema and migration in `supabase/`; data access in `src/lib/db.js` with a single
-  store in `src/data/store.jsx`; all figures derived in `src/lib/analytics.js`.
+  store in `src/data/store.jsx`; the persisted focus timer in `src/data/focus.jsx`; all figures
+  derived in `src/lib/analytics.js`.
 - Grounded Ask engine in `src/lib/ask.js` (pure functions) with recent-ask history in
   `src/lib/askHistory.js`; every screen reads live rows.
 - Absences future work must not fabricate: no real user testimonials, no customers, no

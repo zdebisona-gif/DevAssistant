@@ -11,14 +11,14 @@ import { useData } from '../../data/store.jsx'
 import { todayISO } from '../../lib/analytics.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
-export default function PlanForm({ visible, onClose, date: initialDate, record }) {
+export default function PlanForm({ visible, onClose, date: initialDate, record, tag: initialTag }) {
   const { c, fonts, text } = useTheme()
   const { createPlanEntry, updatePlanEntry } = useData()
   const editing = Boolean(record)
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(initialDate || todayISO())
   const [time, setTime] = useState('')
-  const [tag, setTag] = useState(PLAN_TAGS[0])
+  const [tag, setTag] = useState(initialTag || PLAN_TAGS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -27,10 +27,10 @@ export default function PlanForm({ visible, onClose, date: initialDate, record }
     setTitle(record?.title ?? '')
     setDate(record?.entry_date ?? initialDate ?? todayISO())
     setTime(record?.start_time ? String(record.start_time).slice(0, 5) : '')
-    setTag(record?.tag ?? PLAN_TAGS[0])
+    setTag(record?.tag ?? initialTag ?? PLAN_TAGS[0])
     setError(null)
     setSaving(false)
-  }, [visible, record, initialDate])
+  }, [visible, record, initialDate, initialTag])
 
   const valid = title.trim() && /^\d{4}-\d{2}-\d{2}$/.test(date)
   const normalizedTime = /^\d{1,2}:\d{2}$/.test(time) ? `${time.padStart(5, '0')}:00` : null

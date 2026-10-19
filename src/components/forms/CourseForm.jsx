@@ -14,6 +14,7 @@ export default function CourseForm({ visible, onClose, record }) {
   const [total, setTotal] = useState('')
   const [completed, setCompleted] = useState('')
   const [next, setNext] = useState('')
+  const [weekly, setWeekly] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -23,19 +24,23 @@ export default function CourseForm({ visible, onClose, record }) {
     setTotal(record ? String(record.total_units ?? '') : '')
     setCompleted(record ? String(record.completed_units ?? '') : '')
     setNext(record?.next_label ?? '')
+    setWeekly(record && Number(record.weekly_target_hours) > 0 ? String(Number(record.weekly_target_hours)) : '')
     setError(null)
     setSaving(false)
   }, [visible, record])
 
   const totalUnits = Number.parseInt(total, 10)
   const completedUnits = completed ? Number.parseInt(completed, 10) : 0
+  const weeklyHours = weekly ? Number.parseFloat(weekly) : 0
   const valid =
     name.trim() &&
     Number.isFinite(totalUnits) &&
     totalUnits > 0 &&
     Number.isFinite(completedUnits) &&
     completedUnits >= 0 &&
-    completedUnits <= totalUnits
+    completedUnits <= totalUnits &&
+    Number.isFinite(weeklyHours) &&
+    weeklyHours >= 0
 
   const submit = async () => {
     if (!valid || saving) return
@@ -47,6 +52,7 @@ export default function CourseForm({ visible, onClose, record }) {
         total_units: totalUnits,
         completed_units: completedUnits,
         next_label: next.trim() || null,
+        weekly_target_hours: weeklyHours || 0,
       }
       if (editing) await updateCourse(record.id, payload)
       else await createCourse(payload)
@@ -69,6 +75,14 @@ export default function CourseForm({ visible, onClose, record }) {
         keyboardType="number-pad"
       />
       <Field label="Next up" value={next} onChangeText={setNext} placeholder="Optional · Lesson 35" />
+      <Field
+        label="Weekly target (hours)"
+        value={weekly}
+        onChangeText={setWeekly}
+        placeholder="0"
+        keyboardType="decimal-pad"
+        hint="Optional · shows weekly progress in Learning"
+      />
       {error ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
       ) : null}

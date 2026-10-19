@@ -163,6 +163,34 @@ export function courseRow(course) {
   }
 }
 
+const round1 = (n) => Math.round(n * 10) / 10
+
+/** Hours logged for a course during the week containing `ref`. */
+export function courseWeekHours(sessions, courseId, ref = new Date()) {
+  const start = startOfWeek(ref)
+  const startISO = toISODate(start)
+  const endISO = toISODate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7))
+  let hours = 0
+  for (const session of sessions) {
+    if (session.course_id !== courseId) continue
+    if (session.studied_on >= startISO && session.studied_on < endISO) hours += Number(session.hours) || 0
+  }
+  return round1(hours)
+}
+
+/** Planner entries tagged Study for the given day (default today). */
+export function todayStudyBlocks(planner, ref = new Date()) {
+  return entriesOn(planner, toISODate(ref)).filter(
+    (entry) => (entry.tag || '').toLowerCase() === 'study',
+  )
+}
+
+export function recentSessions(sessions, limit = 5) {
+  return [...sessions]
+    .sort((a, b) => (b.studied_on || '').localeCompare(a.studied_on || ''))
+    .slice(0, limit)
+}
+
 function timeLabel(value) {
   if (!value) return null
   return String(value).slice(0, 5)
