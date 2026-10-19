@@ -18,6 +18,8 @@ const EMPTY = {
   units: [],
   sessions: [],
   planner: [],
+  projects: [],
+  penalties: [],
 }
 
 const DataContext = createContext(null)
@@ -99,6 +101,23 @@ export function DataProvider({ children }) {
       updatePlanEntry: (id, patch) => mutate(() => db.updatePlanEntry(id, patch)),
       deletePlanEntry: (id) => mutate(() => db.deletePlanEntry(id)),
       togglePlanEntry: (id, done) => mutate(() => db.updatePlanEntry(id, { done })),
+      createProject: (row) => mutate(() => db.addProject(row)),
+      updateProject: (id, patch) => mutate(() => db.updateProject(id, patch)),
+      deleteProject: (id) => mutate(() => db.deleteProject(id)),
+      createPenalty: (row) => mutate(() => db.addPenalty(row)),
+      atonePenalty: (penalty) =>
+        mutate(async () => {
+          await db.updatePenalty(penalty.id, {
+            atonement: penalty.atonement,
+            atoned: true,
+            atoned_at: new Date().toISOString(),
+          })
+          await db.addNote({
+            title: `Atonement: ${penalty.project_title}`,
+            body: penalty.atonement,
+            tag: 'Personal',
+          })
+        }),
     }),
     [data, loading, error, reload, mutate],
   )

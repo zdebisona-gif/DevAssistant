@@ -168,3 +168,33 @@ export async function generatePlan({ scope = 'general', horizon = 'week', goal =
   const items = Array.isArray(data?.json?.items) ? data.json.items : []
   return { items, model: data.model, remaining: data.remaining, cap: data.cap }
 }
+
+/**
+ * Ask the proxy to judge a project submission against its brief and criteria.
+ * @returns {Promise<{ verdict: 'pass'|'fail', score: number|null, feedback: string, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function assessSubmission({ title, brief, criteria, submission, link }) {
+  const question = `Assess this submission for the project: ${String(title || '').trim()}`.slice(0, 500)
+  const context = [
+    `Brief: ${String(brief || '').trim()}`,
+    `Success criteria: ${String(criteria || '').trim() || 'not specified'}`,
+    `Submission (the user's write-up): ${String(submission || '').trim()}`,
+    `Link (if any): ${String(link || '').trim() || 'none'}`,
+  ]
+    .join('\n')
+    .slice(0, 4000)
+
+  const data = await invokeProxy({ task: 'assess-submission', question, context })
+  const result = data.json
+  if (!result?.verdict) throw new GeminiUnavailable('empty')
+
+  return {
+    verdict: result.verdict === 'pass' ? 'pass' : 'fail',
+    score: Number.isFinite(result.score) ? result.score : null,
+    feedback: String(result.feedback || '').trim(),
+    model: data.model,
+    remaining: data.remaining,
+    cap: data.cap,
+  }
+}

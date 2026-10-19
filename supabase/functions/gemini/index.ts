@@ -128,6 +128,24 @@ const PLAN_RULES = [
   'Keep titles under 60 characters. Do not duplicate existing entries.',
 ].join(' ')
 
+const ASSESS_SCHEMA = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['pass', 'fail'] },
+    score: { type: 'number' },
+    feedback: { type: 'string' },
+  },
+  required: ['verdict', 'score', 'feedback'],
+}
+
+const ASSESS_RULES = [
+  'You judge whether a completed deliverable meets the project brief and its success criteria.',
+  'Return JSON only. Base the verdict only on the submission and the criteria given; never invent work.',
+  'verdict "pass" only if the submission plausibly satisfies the criteria; otherwise "fail".',
+  'score is 0-100. feedback is 1-3 concrete sentences: what was met and what is thin.',
+  'Be strict but fair, and never reward effort described without any deliverable.',
+].join(' ')
+
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -151,6 +169,7 @@ const BASE_RULES = [
 
 function systemFor(task: string) {
   if (task === 'extract-action') return ACTION_RULES
+  if (task === 'assess-submission') return ASSESS_RULES
   if (task === 'summarize-note') {
     return `${BASE_RULES} The user has explicitly asked you to summarize one note. Keep it to two sentences.`
   }
@@ -183,6 +202,19 @@ function requestFor(task: string, question: string, context: string) {
         maxOutputTokens: 800,
         responseMimeType: 'application/json',
         responseSchema: PLAN_SCHEMA,
+      },
+    }
+  }
+
+  if (task === 'assess-submission') {
+    return {
+      systemInstruction: { parts: [{ text: ASSESS_RULES }] },
+      contents: [{ role: 'user', parts: [{ text: `${question}\n\n${context}` }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 300,
+        responseMimeType: 'application/json',
+        responseSchema: ASSESS_SCHEMA,
       },
     }
   }
@@ -301,6 +333,27 @@ Deno.serve(async (req) => {
     const items = Array.isArray(parsed?.items) ? parsed.items.slice(0, 12) : []
     return json({
       json: { items },
+      model: MODEL,
+      remaining: Math.max(0, DAILY_CAP - used),
+      cap: DAILY_CAP,
+    })
+  }
+
+  if (task === 'assess-submission') {
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return json({ error: 'bad-assessment' }, 502)
+    }
+    const verdict = parsed?.verdict === 'pass' ? 'pass' : 'fail'
+    const score = Number.isFinite(Number(parsed?.score))
+      ? Math.max(0, Math.min(100, Math.round(Number(parsed.score))))
+      : null
+    const feedback = String(parsed?.feedback || '').slice(0, 600).trim()
+    if (!feedback) return json({ error: 'bad-assessment' }, 502)
+    return json({
+      json: { verdict, score, feedback },
       model: MODEL,
       remaining: Math.max(0, DAILY_CAP - used),
       cap: DAILY_CAP,

@@ -33,21 +33,22 @@ not truthfully copy this cross-record grounding.
 - Onboarding walkthrough introduces the unified data layer, record-grounded answers, and goal
   tracking; replayable from Settings.
 - Light and dark appearance, following the device setting.
-- Four kinds of records drive everything: Finances (spending, budgets, transactions), Notes,
-  Planner (today and weekly schedule), and Learning (courses, streaks, study hours, a focus timer
-  and per-session takeaways). A fifth record type — weekly projects — is planned.
+- Five kinds of records drive everything: Finances (spending, budgets, transactions), Notes,
+  Planner (today and weekly schedule), Learning (courses, streaks, study hours, a focus timer and
+  per-session takeaways), and Projects (deadline deliverables, assessments and a penalty ledger).
 - Records live in Supabase (Postgres). The UI shell was built first, reviewed, then wired to real
   data; sign-in is the remaining phase before the app is single-user-secure.
 
 ## Capabilities and Constraints
 
-- Confirmed surfaces: Dashboard, Ask Zen-I, Notes, Finances, Planner, Learning, Settings, and a
-  first-run onboarding flow.
+- Confirmed surfaces: Dashboard, Ask Zen-I, Notes, Finances, Planner, Projects, Learning, Settings,
+  and a first-run onboarding flow.
 - Ask Zen-I answers questions across the app's records and returns a written answer plus a
   breakdown, an insight, and suggested follow-ups.
 - Data is **live** in Supabase: the app reads and writes the user's own records (notes,
-  transactions, budgets, courses, study sessions, planner entries). Dev access uses temporary
-  permissive RLS policies on the `anon` role; auth (Phase 3) replaces them before shipping.
+  transactions, budgets, courses, study sessions, planner entries, projects and penalties). Dev
+  access uses temporary permissive RLS policies on the `anon` role; auth (Phase 3) replaces them
+  before shipping.
 - Ask Zen-I is grounded: answers are computed from the user's records in `src/lib/ask.js` and
   return a written answer, a breakdown, an insight, follow-ups and a Sources line naming which
   records were read. This on-device engine is the default answer path.
@@ -77,6 +78,12 @@ not truthfully copy this cross-record grounding.
   a checkbox list ("Add N of M") before anything is written, and one generation is one AI request.
 - Courses carry units (`public.course_units`); completing a unit advances the course's completed
   count without logging a study session.
+- Projects are commitments with teeth: each is a one-off deliverable with a brief, success criteria
+  and a deadline. A submission is a written write-up plus an optional link, judged by a dedicated
+  Gemini task (`assess-submission`) against the brief — or self-assessed when AI is off. Passing
+  settles the project; failing, or being marked missed, forfeits credits into a permanent penalty
+  ledger and locks new projects until an atonement note is written (which is also saved as a note).
+  Credits start at 100 and are derived from the ledger, never invented.
 - Learning is connected, not isolated: a focus timer records real sessions (persisted across
   restarts), sessions link to a course and capture a takeaway, today's Study-tagged planner blocks
   are startable from Learning, courses carry a weekly hour target, and saving a takeaway also
@@ -102,7 +109,8 @@ not truthfully copy this cross-record grounding.
   `src/lib/askHistory.js`; per-domain context builders in `src/lib/context.js`; Gemini routing and
   the proxy client in `src/lib/intent.js` and `src/lib/gemini.js`; the on/off preference and usage
   reading in `src/data/aiPrefs.jsx`; the plan generator, horizons and deterministic study fallback in
-  `src/lib/planWithAi.js`; every screen reads live rows.
+  `src/lib/planWithAi.js`; project deadlines, credits, lock state and the penalty ledger in
+  `src/lib/projects.js`; every screen reads live rows.
 - Absences future work must not fabricate: no real user testimonials, no customers, no
   benchmarks, and no pricing.
 

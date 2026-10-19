@@ -130,3 +130,36 @@ export function validateSession(input) {
     },
   }
 }
+
+export function validateProject(input) {
+  const title = String(input?.title ?? '').trim()
+  if (!title) return { ok: false, error: 'Name the project.' }
+  const brief = String(input?.brief ?? '').trim()
+  if (!brief) return { ok: false, error: 'Describe what you will deliver.' }
+  const due = input?.due_date || todayISO()
+  if (!isISODate(due)) return { ok: false, error: 'Use a valid deadline.' }
+  return {
+    ok: true,
+    payload: {
+      title,
+      brief,
+      criteria: input?.criteria ? String(input.criteria).trim() : null,
+      due_date: due,
+      due_time: normalizeTime(input?.due_time ?? input?.time),
+    },
+  }
+}
+
+const LINK = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([/?#][^\s]*)?$/i
+
+export function validateSubmission(input) {
+  const text = String(input?.text ?? input?.write_up ?? '').trim()
+  if (!text) return { ok: false, error: 'Write what you delivered.' }
+  const raw = String(input?.link ?? '').trim()
+  let link = null
+  if (raw) {
+    if (!LINK.test(raw)) return { ok: false, error: 'That link does not look like a URL.' }
+    link = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+  }
+  return { ok: true, payload: { submission_text: text, submission_link: link } }
+}

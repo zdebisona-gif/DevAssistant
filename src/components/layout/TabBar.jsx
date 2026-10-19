@@ -101,6 +101,7 @@ export default function TabBar({ state, navigation }) {
             >
               <item.icon size={22} weight={focused ? 'fill' : 'regular'} color={tint} />
               <Text
+                numberOfLines={1}
                 style={{
                   fontFamily: focused ? fonts.sansSemiBold : fonts.sans,
                   fontSize: 10,

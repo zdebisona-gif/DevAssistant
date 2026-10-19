@@ -10,16 +10,19 @@ async function selectAll(table, order) {
 
 /** Fetch every table the app reads. Rows are tiny, so one round-trip each is fine. */
 export async function loadAll() {
-  const [budgets, transactions, notes, courses, units, sessions, planner] = await Promise.all([
-    selectAll('budgets', { column: 'category' }),
-    selectAll('transactions', { column: 'occurred_on', ascending: false }),
-    selectAll('notes', { column: 'updated_at', ascending: false }),
-    selectAll('courses', { column: 'position' }),
-    selectAll('course_units', { column: 'position' }),
-    selectAll('study_sessions', { column: 'studied_on' }),
-    selectAll('planner_entries', { column: 'entry_date' }),
-  ])
-  return { budgets, transactions, notes, courses, units, sessions, planner }
+  const [budgets, transactions, notes, courses, units, sessions, planner, projects, penalties] =
+    await Promise.all([
+      selectAll('budgets', { column: 'category' }),
+      selectAll('transactions', { column: 'occurred_on', ascending: false }),
+      selectAll('notes', { column: 'updated_at', ascending: false }),
+      selectAll('courses', { column: 'position' }),
+      selectAll('course_units', { column: 'position' }),
+      selectAll('study_sessions', { column: 'studied_on' }),
+      selectAll('planner_entries', { column: 'entry_date' }),
+      selectAll('projects', { column: 'due_date' }),
+      selectAll('project_penalties', { column: 'created_at', ascending: false }),
+    ])
+  return { budgets, transactions, notes, courses, units, sessions, planner, projects, penalties }
 }
 
 async function insert(table, row) {
@@ -66,3 +69,11 @@ export const deleteSession = (id) => remove('study_sessions', id)
 export const addPlanEntry = (row) => insert('planner_entries', row)
 export const updatePlanEntry = (id, patch) => update('planner_entries', id, patch)
 export const deletePlanEntry = (id) => remove('planner_entries', id)
+
+export const addProject = (row) => insert('projects', row)
+export const updateProject = (id, patch) => update('projects', id, patch)
+export const deleteProject = (id) => remove('projects', id)
+
+export const addPenalty = (row) => insert('project_penalties', row)
+export const updatePenalty = (id, patch) => update('project_penalties', id, patch)
+export const deletePenalty = (id) => remove('project_penalties', id)
