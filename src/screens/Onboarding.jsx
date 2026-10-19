@@ -23,7 +23,7 @@ function ContextVisual() {
     { icon: Notebook, label: 'Notes', value: '47', tone: c.primaryFg },
     { icon: CurrencyCircleDollar, label: 'Money', value: '₱2,225', tone: c.primaryFg },
     { icon: ChartLineUp, label: 'Learning', value: '4.5h', tone: c.accentText },
-    { icon: Target, label: 'Goals', value: '6', tone: c.primaryFg },
+    { icon: Target, label: 'Projects', value: '3', tone: c.primaryFg },
   ]
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -193,19 +193,19 @@ const STEPS = [
   {
     icon: SquaresFour,
     title: 'Everything in one place',
-    body: 'Notes, spending, plans and learning progress in a single place — not scattered across five apps.',
+    body: 'Notes, spending, plans, projects and learning progress in a single place — not scattered across five apps.',
     Visual: ContextVisual,
   },
   {
     icon: Sparkle,
     title: 'Ask about your own data',
-    body: 'Not a generic chatbot. Ask about your money, notes and schedule, and get answers backed by your records.',
+    body: 'Not a generic chatbot. Ask about your money, notes, projects and schedule, and get answers backed by your records.',
     Visual: AskVisual,
   },
   {
     icon: Target,
     title: 'Track goals, not just chats',
-    body: 'Set budgets, study targets and weekly plans — Zen-I watches the numbers and flags what needs attention.',
+    body: 'Set budgets, study targets and deadline projects — Zen-I watches the numbers and flags what needs attention.',
     Visual: GoalsVisual,
   },
 ]

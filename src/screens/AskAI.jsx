@@ -324,7 +324,7 @@ export default function AskAI() {
         ? 'Gemini is cooling down after its free limit, so here is the on-device answer.'
         : 'AI is off, so this is the on-device answer. Turn it on in Settings for advice.'
     } else if (intent.kind === 'clarify') {
-      reply.note = 'Name an area — spending, study or your plan — and I can go deeper.'
+      reply.note = 'Name an area — spending, study, projects or your plan — and I can go deeper.'
     }
 
     setMessages((prev) => [...prev, { id: `a${stamp}`, role: 'assistant', ...reply }])

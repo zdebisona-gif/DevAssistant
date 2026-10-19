@@ -21,6 +21,7 @@ import {
   validateCourse,
   validateNote,
   validatePlanEntry,
+  validateProject,
   validateTransaction,
 } from './validation.js'
 
@@ -40,6 +41,7 @@ export const ALLOWED_ACTIONS = [
   'add_course_unit',
   'complete_course_unit',
   'delete_course_unit',
+  'create_project',
 ]
 
 const ALLOWED = new Set(ALLOWED_ACTIONS)
@@ -500,6 +502,32 @@ function buildDeleteCourseUnit(args, data) {
   })
 }
 
+function buildCreateProject(args) {
+  const title = String(args.title || args.name || '').trim()
+  const checked = validateProject({
+    title,
+    brief: args.brief || title,
+    criteria: args.criteria,
+    due_date: args.due || args.date,
+    due_time: args.time,
+  })
+  if (!checked.ok) return fail(checked.error)
+  const payload = checked.payload
+  return ok('create_project', 'local', {
+    payload,
+    summary: `Create the project “${payload.title}”`,
+    details: [
+      { label: 'Project', value: payload.title },
+      { label: 'Brief', value: payload.brief },
+      {
+        label: 'Deadline',
+        value: `${formatDateShort(payload.due_date)}${payload.due_time ? ` ${payload.due_time.slice(0, 5)}` : ''}`,
+      },
+      ...(payload.criteria ? [{ label: 'Passes when', value: payload.criteria }] : []),
+    ],
+  })
+}
+
 const BUILDERS = {
   create_transaction: (args) => buildCreateTransaction(args),
   update_transaction: buildUpdateTransaction,
@@ -516,6 +544,7 @@ const BUILDERS = {
   add_course_unit: buildAddCourseUnit,
   complete_course_unit: buildCompleteCourseUnit,
   delete_course_unit: buildDeleteCourseUnit,
+  create_project: (args) => buildCreateProject(args),
 }
 
 export function buildProposal(action, args, data) {
@@ -549,6 +578,9 @@ const DEL_TX_RE = /^(?:delete|remove|trash)\s+(?:the\s+)?(?:transaction|expense|
 
 const RENAME_NOTE_RE = /^(?:rename|change)\s+(?:the\s+)?note\s+(?:called\s+|titled\s+)?"?(.+?)"?\s+to\s+(.+)$/i
 const UPDATE_BUDGET_RE = /^(?:change|update|set)\s+(?:the\s+)?budget\s+(?:for|on)\s+(.+?)\s+to\s+(?:[$£€₱]\s*)?([\d.,]+)$/i
+
+const PROJECT_RE = /^(?:add|create|start|new)\s+(?:a\s+)?project\s+(?:called\s+|titled\s+)?(.+)$/i
+const PROJECT_DUE_RE = /\s+due\s+(today|tomorrow|tonight|\d{4}-\d{2}-\d{2})\s*$/i
 
 function splitTitleBody(rest) {
   const match = String(rest || '').match(/^(.+?)\s*:\s*(.+)$/)
@@ -596,6 +628,20 @@ export function parseLocalAction(text, data) {
   match = value.match(RENAME_NOTE_RE)
   if (match) {
     return buildProposal('update_note', { target: match[1], title: match[2] }, data)
+  }
+
+  match = value.match(PROJECT_RE)
+  if (match) {
+    let rest = match[1].trim()
+    const dueMatch = rest.match(PROJECT_DUE_RE)
+    if (dueMatch) rest = rest.slice(0, dueMatch.index).trim()
+    const due = dueMatch ? dateFrom(dueMatch[1]) : null
+    if (due) {
+      const { title, body } = splitTitleBody(rest)
+      return buildProposal('create_project', { title, brief: body || title, due }, data)
+    }
+    /* No deadline given — let the model resolve the date rather than guess today. */
+    return null
   }
 
   match = value.match(PLAN_AT_RE) || value.match(PLAN_TODAY_RE) || value.match(REMIND_RE)
@@ -687,6 +733,8 @@ export async function runAction(services, proposal) {
       return services.completeCourseUnit(proposal.target.id, true)
     case 'delete_course_unit':
       return services.deleteCourseUnit(proposal.target.id)
+    case 'create_project':
+      return services.createProject(proposal.payload)
     default:
       throw new Error('That action is not allowed.')
   }
@@ -708,4 +756,5 @@ export const ACTION_LABELS = {
   add_course_unit: 'Add unit',
   complete_course_unit: 'Complete unit',
   delete_course_unit: 'Delete unit',
+  create_project: 'Add project',
 }

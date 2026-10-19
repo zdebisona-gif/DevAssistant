@@ -165,6 +165,8 @@ export default function Settings() {
             <CountRow label="Plan entries" count={data.planner.length} />
             <CountRow label="Courses" count={data.courses.length} />
             <CountRow label="Study sessions" count={data.sessions.length} />
+            <CountRow label="Projects" count={data.projects.length} />
+            <CountRow label="Penalties" count={data.penalties.length} />
           </View>
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}

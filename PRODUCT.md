@@ -67,10 +67,10 @@ not truthfully copy this cross-record grounding.
   the note viewer; the chatbot never sends note bodies on its own.
 - Ask Zen-I can also act: commands like "spent 12.50 on coffee" or "delete the note about milk"
   are parsed (on-device first, Gemini fallback when AI is on) into a single whitelisted action —
-  log or change a transaction, budget, plan entry or note. Every write shows a confirmation card
-  with the exact change before it runs, and deletes are flagged as irreversible. Targets for edits
-  and deletes are matched against rows already in memory, so record titles and ids are never sent
-  to Gemini.
+  log or change a transaction, budget, plan entry, note, course unit or project. Every write shows
+  a confirmation card with the exact change before it runs, and deletes are flagged as irreversible.
+  Targets for edits and deletes are matched against rows already in memory, so record titles and
+  ids are never sent to Gemini.
 - "Plan with AI" is a shared capability, not a Learning-only feature: one sheet with a General or
   Study scope (the scope toggle appears only when a course exists), a horizon of Today / This week /
   Next 7 days, and an optional goal. Study scope falls back to a deterministic local plan when AI is

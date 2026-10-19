@@ -9,6 +9,7 @@ import {
   budgetProgress,
   currentStreak,
   entriesOn,
+  formatDateShort,
   isoWeek,
   todayISO,
   toISODate,
@@ -17,6 +18,7 @@ import {
   weekHours,
 } from './analytics.js'
 import { money } from './format.js'
+import { creditBalance, dueMeta, openPenalties, sortProjects } from './projects.js'
 
 const CATEGORY_KEYWORDS = [
   { key: 'Food & Dining', re: /food|dining|eat|restaurant|takeout|lunch|dinner/i },
@@ -109,7 +111,7 @@ function when(dateISO) {
 function emptyResult(question) {
   return {
     answer:
-      'I do not have any records to answer that yet. Add a note, a transaction, a plan entry or a study session and ask again.',
+      'I do not have any records to answer that yet. Add a note, a transaction, a plan entry, a project or a study session and ask again.',
     breakdown: [],
     insight: 'Zen-I answers only from your own records, so an empty app means an empty answer.',
     followUps: ['How much did I spend this month?', "What's on my plan today?", 'Any notes this week?'],
@@ -120,12 +122,68 @@ function emptyResult(question) {
 
 export function answerQuery(question, data) {
   const q = String(question || '')
-  const { transactions = [], budgets = [], notes = [], sessions = [], planner = [], courses = [] } = data || {}
+  const {
+    transactions = [],
+    budgets = [],
+    notes = [],
+    sessions = [],
+    planner = [],
+    courses = [],
+    projects = [],
+    penalties = [],
+  } = data || {}
   const hasAnything =
-    transactions.length + budgets.length + notes.length + sessions.length + planner.length + courses.length > 0
+    transactions.length +
+      budgets.length +
+      notes.length +
+      sessions.length +
+      planner.length +
+      courses.length +
+      projects.length +
+      penalties.length >
+    0
   if (!hasAnything) return emptyResult(q)
 
   const stamp = { queriedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+
+  // Projects — deadlines, credits and the lock. Checked before Plan, which also matches "week".
+  if (/project|deliverable|deadline|overdue|\bdue\b|penalt|atonement|atone|credits|locked/i.test(q)) {
+    if (!projects.length && !penalties.length) {
+      return {
+        answer: 'You have no projects yet. Add one with a deadline and I can track it against your credits.',
+        breakdown: [],
+        insight: 'Failing or missing a deadline forfeits credits until you write an atonement.',
+        followUps: ['What is on my plan this week?'],
+        sources: ['Projects'],
+        ...stamp,
+      }
+    }
+    const ordered = sortProjects(projects)
+    const active = ordered.filter((project) => project.status === 'active')
+    const settled = projects.length - active.length
+    const balance = creditBalance(penalties)
+    const open = openPenalties(penalties)
+    const soonest = active[0]
+    const next = soonest
+      ? dueMeta(soonest).overdue
+        ? ` “${soonest.title}” is overdue.`
+        : ` Next up: “${soonest.title}”, due ${formatDateShort(soonest.due_date)}.`
+      : ''
+    return {
+      answer: `${active.length} ${active.length === 1 ? 'project' : 'projects'} in progress, ${settled} settled.${next}`,
+      breakdown: [
+        { label: 'In progress', value: active.length, limit: Math.max(projects.length, 1) },
+        { label: 'Settled', value: settled, limit: Math.max(projects.length, 1) },
+      ],
+      insight:
+        open.length > 0
+          ? `${open.length} open penalt${open.length === 1 ? 'y' : 'ies'} — new projects are locked until you atone. Credits: ${balance}.`
+          : `Credits: ${balance}. No open penalties.`,
+      followUps: ['Am I locked out of new projects?', 'What is on my plan this week?'],
+      sources: ['Projects'],
+      ...stamp,
+    }
+  }
 
   // Plan — today / tomorrow / a named day.
   if (/plan|schedul|calendar|tomorrow|today|agenda|week/i.test(q)) {
@@ -382,9 +440,10 @@ export function answerQuery(question, data) {
     `${planner.length} plan entries`,
     `${sessions.length} study sessions`,
     `${courses.length} courses`,
+    `${projects.length} projects`,
   ].join(' · ')
   return {
-    answer: `I can answer from what you have logged: ${summary}. Try asking about spending, your plan, notes or study hours.`,
+    answer: `I can answer from what you have logged: ${summary}. Try asking about spending, your plan, projects, notes or study hours.`,
     breakdown: [],
     insight: `This is week ${isoWeek()}.`,
     followUps: [
@@ -392,14 +451,14 @@ export function answerQuery(question, data) {
       "What's on my plan today?",
       'How many hours did I study this week?',
     ],
-    sources: ['Finances', 'Notes', 'Planner', 'Learning'],
+    sources: ['Finances', 'Notes', 'Planner', 'Learning', 'Projects'],
     ...stamp,
   }
 }
 
 /** Suggestion chips derived from what the user actually has. */
 export function deriveSuggestions(data, count = 4) {
-  const { transactions = [], notes = [], planner = [], sessions = [] } = data || {}
+  const { transactions = [], notes = [], planner = [], sessions = [], projects = [] } = data || {}
   const out = []
   const now = new Date()
   const spentThisMonth = transactions.some((tx) => {
@@ -413,6 +472,7 @@ export function deriveSuggestions(data, count = 4) {
   if (planner.length) out.push("What's on my plan today?")
   if (sessions.length) out.push('How many hours did I study this week?')
   if (notes.length) out.push('Summarize my recent notes')
+  if (projects.length) out.push("What's due this week?")
   out.push('How is my budget doing?')
   return Array.from(new Set(out)).slice(0, count)
 }

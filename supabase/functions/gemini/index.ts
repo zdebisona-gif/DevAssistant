@@ -51,7 +51,7 @@ const ACTIONS = [
   'add_course_unit',
   'complete_course_unit',
   'delete_course_unit',
-  'create_study_plan',
+  'create_project',
 ] as const
 
 const ACTION_SCHEMA = {
@@ -80,8 +80,35 @@ const ACTION_SCHEMA = {
         next: { type: 'string' },
         course: { type: 'string' },
         unit: { type: 'string' },
+        brief: { type: 'string' },
+        criteria: { type: 'string' },
+        due: { type: 'string' },
         scope: { type: 'string', enum: ['general', 'study'] },
       },
+      propertyOrdering: [
+        'target',
+        'title',
+        'brief',
+        'criteria',
+        'due',
+        'date',
+        'time',
+        'body',
+        'merchant',
+        'amount',
+        'type',
+        'category',
+        'account',
+        'tag',
+        'limit',
+        'name',
+        'units',
+        'weekly_target',
+        'next',
+        'course',
+        'unit',
+        'scope',
+      ],
     },
   },
   required: ['action', 'confidence'],
@@ -95,6 +122,7 @@ const ACTION_RULES = [
   'For create/update, fill only the fields the user gave. Amounts are positive; use type "expense" unless income is implied.',
   'Resolve relative dates to YYYY-MM-DD using the provided Today. Times are 24-hour "HH:MM".',
   'Prefer the allowed categories and tags listed in the context. Return JSON only.',
+  'Only for create_project, always set three args: title (a short project name), brief (one sentence describing the deliverable, using the user\'s words or the title if they gave no detail), and due (the deadline as YYYY-MM-DD resolved from the message, e.g. "friday"). Put stated success criteria in criteria.',
 ].join(' ')
 
 const PLAN_SCHEMA = {

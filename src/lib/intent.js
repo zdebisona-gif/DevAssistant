@@ -13,6 +13,10 @@ const DOMAIN_RULES = [
     re: /\b(spend|spent|spending|budget|budgets|money|expense|expenses|income|salary|earn|earnings|save|saving|savings|afford|bill|bills|cost|costs|financ\w*|cheaper|overspend|overspending)\b/i,
   },
   {
+    key: 'projects',
+    re: /\b(project|projects|deliverable|deliverables|deadline|deadlines|due|overdue|penalt\w*|atonement|atone|credits|locked)\b/i,
+  },
+  {
     key: 'learning',
     re: /\b(study|studying|learn|learning|course|courses|streak|revision|revise|exam|exams|topic|topics|practice|practise|memori[sz]e|java|python|math|maths)\b/i,
   },

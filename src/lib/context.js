@@ -20,6 +20,7 @@ import {
   weekHours,
 } from './analytics.js'
 import { money } from './format.js'
+import { creditBalance, dueMeta, openPenalties, sortProjects } from './projects.js'
 
 /** Aggregate spend per category for the current month (no individual transactions). */
 function monthCategoryTotals(transactions) {
@@ -123,6 +124,35 @@ export function buildPlannerContext(data) {
   return { context: lines.join('\n'), sources: ['Planner'] }
 }
 
+export function buildProjectsContext(data) {
+  const { projects = [], penalties = [] } = data || {}
+  const ordered = sortProjects(projects)
+  const active = ordered.filter((project) => project.status === 'active')
+  const balance = creditBalance(penalties)
+  const open = openPenalties(penalties)
+
+  const lines = [
+    `Credits: ${balance}. ${open.length} open penalt${open.length === 1 ? 'y' : 'ies'}${
+      open.length ? ' — new projects are locked until atoned' : ''
+    }.`,
+  ]
+
+  if (active.length) {
+    lines.push('Projects in progress:')
+    for (const project of active.slice(0, 8)) {
+      const meta = dueMeta(project)
+      lines.push(`- ${project.title} — due ${formatDateShort(project.due_date)}${meta.overdue ? ' (overdue)' : ''}`)
+    }
+  } else {
+    lines.push('No projects are in progress.')
+  }
+
+  const settled = projects.length - active.length
+  if (settled > 0) lines.push(`Settled projects: ${settled}.`)
+
+  return { context: lines.join('\n'), sources: ['Projects'] }
+}
+
 /** Only used when the user explicitly asks about one note. */
 export function buildNoteContext(note) {
   if (!note) return { context: '', sources: [] }
@@ -136,6 +166,7 @@ const BUILDERS = {
   finance: buildFinanceContext,
   learning: buildLearningContext,
   planner: buildPlannerContext,
+  projects: buildProjectsContext,
 }
 
 export function buildContextFor(domain, data) {

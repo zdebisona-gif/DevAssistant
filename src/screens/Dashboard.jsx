@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { CalendarBlank, Check, Fire, Notebook, Plus, Wallet } from '../icons.js'
+import { CalendarBlank, Check, Fire, Notebook, Plus, Target, Wallet } from '../icons.js'
 import { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Button from '../components/ui/Button.jsx'
@@ -30,6 +30,7 @@ import {
   totalsForPrevMonth,
 } from '../lib/analytics.js'
 import { greeting, money } from '../lib/format.js'
+import { creditBalance, dueMeta, sortProjects } from '../lib/projects.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 const TODAY = new Date().toLocaleDateString(undefined, {
@@ -194,6 +195,53 @@ function GlanceRow({ icon: Icon, label, value, to }) {
   )
 }
 
+function DueRow({ project }) {
+  const { c, fonts, text } = useTheme()
+  const router = useRouter()
+  const meta = dueMeta(project)
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${project.title}, ${meta.overdue ? 'overdue, was due' : 'due'} ${meta.label}`}
+      onPress={() => router.push('/projects')}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        backgroundColor: pressed ? c.overline : 'transparent',
+      })}
+    >
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 10,
+          backgroundColor: c.muted,
+        }}
+      >
+        <Target size={17} color={c.foreground} />
+      </View>
+      <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}>
+        {project.title}
+      </Text>
+      <Text
+        style={{
+          fontFamily: fonts.mono,
+          fontSize: text.micro,
+          color: meta.overdue ? c.destructive : c.mutedForeground,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {meta.overdue ? 'Overdue' : meta.label}
+      </Text>
+    </Pressable>
+  )
+}
+
 export default function Dashboard() {
   const { c, fonts, radius, text } = useTheme()
   const { data, loading, error, reload, togglePlanEntry } = useData()
@@ -228,6 +276,8 @@ export default function Dashboard() {
   const remaining = budgetTotal - spend
   const today = entriesOn(data.planner, todayISO())
   const streak = currentStreak(data.sessions)
+  const activeProjects = sortProjects(data.projects).filter((project) => project.status === 'active')
+  const credits = creditBalance(data.penalties)
 
   return (
     <Screen
@@ -307,6 +357,28 @@ export default function Dashboard() {
 
       <Today entries={today} onToggle={togglePlanEntry} onAdd={() => setFormOpen(true)} />
 
+      {activeProjects.length ? (
+        <Section
+          title="Due soon"
+          action={
+            <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+              {credits} credits
+            </Text>
+          }
+        >
+          <Card>
+            {activeProjects.slice(0, 3).map((project, index) => (
+              <View key={project.id}>
+                {index ? (
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
+                ) : null}
+                <DueRow project={project} />
+              </View>
+            ))}
+          </Card>
+        </Section>
+      ) : null}
+
       <Section title="At a glance">
         <Card>
           <GlanceRow icon={Notebook} label="Notes" value={`${data.notes.length}`} to="/notes" />
@@ -326,6 +398,13 @@ export default function Dashboard() {
           />
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
           <GlanceRow icon={CalendarBlank} label="Planner" value={`Week ${isoWeek()}`} to="/planner" />
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
+          <GlanceRow
+            icon={Target}
+            label="Projects"
+            value={`${activeProjects.length} active`}
+            to="/projects"
+          />
         </Card>
       </Section>
 
