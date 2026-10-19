@@ -21,6 +21,7 @@ import Chip from '../components/ui/Chip.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
 import { useData } from '../data/store.jsx'
 import { useAiPrefs } from '../data/aiPrefs.jsx'
+import { usePrivacy } from '../data/privacy.jsx'
 import { answerQuery, deriveSuggestions } from '../lib/ask.js'
 import { buildActionContext, buildExtractedProposal, looksLikeCommand, parseLocalAction, runAction } from '../lib/actions.js'
 import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
@@ -228,6 +229,7 @@ export default function AskAI() {
   const services = useData()
   const { data } = services
   const { enabled: aiEnabled, recordUsage } = useAiPrefs()
+  const { hidden } = usePrivacy()
   const { q } = useLocalSearchParams()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -253,7 +255,7 @@ export default function AskAI() {
     setPending(true)
     pushAskHistory(value, history).then(setHistory)
 
-    const local = answerQuery(value, data)
+    const local = answerQuery(value, data, { hidden })
     const reply = { ...local, label: 'Local answer' }
 
     let outcome = parseLocalAction(value, data)
@@ -271,7 +273,7 @@ export default function AskAI() {
     if (!outcome && looksLikeCommand(value) && aiEnabled && !inCooldown()) {
       triedAction = true
       try {
-        const extracted = await extractAction({ text: value, context: buildActionContext() })
+        const extracted = await extractAction({ text: value, context: buildActionContext(data) })
         recordUsage({ remaining: extracted.remaining, cap: extracted.cap, model: extracted.model })
         outcome = extracted.action === 'none' ? null : buildExtractedProposal(extracted, data)
       } catch {
@@ -306,7 +308,7 @@ export default function AskAI() {
 
     if (intent.kind === 'ai' && aiEnabled && !inCooldown() && !triedAction) {
       try {
-        const { context, sources } = buildContextFor(intent.domain, data)
+        const { context, sources } = buildContextFor(intent.domain, data, { hidden })
         const { text: aiText, model, remaining, cap } = await askGemini({
           task: 'advise',
           question: value,
@@ -476,7 +478,7 @@ export default function AskAI() {
               onChangeText={setInput}
               onSubmitEditing={() => ask(input)}
               returnKeyType="send"
-              placeholder="Ask about your spending, notes or plans"
+              placeholder="Ask about your spending, notes, plans or study"
               placeholderTextColor={c.mutedForeground}
               style={{
                 flex: 1,

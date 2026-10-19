@@ -40,7 +40,7 @@ export default function Projects() {
 
   if (loading) {
     return (
-      <Screen title="Projects" subtitle="Deliverables with a deadline">
+      <Screen title="Projects" subtitle="Deliverables with a deadline" left="back" tabbed={false}>
         <Loading label="Loading projects" />
       </Screen>
     )
@@ -48,7 +48,7 @@ export default function Projects() {
 
   if (error) {
     return (
-      <Screen title="Projects" subtitle="Deliverables with a deadline">
+      <Screen title="Projects" subtitle="Deliverables with a deadline" left="back" tabbed={false}>
         <ErrorState error={error} onRetry={reload} />
       </Screen>
     )
@@ -136,6 +136,8 @@ export default function Projects() {
     <Screen
       title="Projects"
       subtitle="Deliverables with a deadline"
+      left="back"
+      tabbed={false}
       right={
         <Button
           size="sm"

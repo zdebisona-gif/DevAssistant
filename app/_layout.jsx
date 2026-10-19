@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '../src/data/auth.jsx'
 import { DataProvider } from '../src/data/store.jsx'
 import { FocusProvider } from '../src/data/focus.jsx'
 import { AiPrefsProvider } from '../src/data/aiPrefs.jsx'
+import { PrivacyProvider } from '../src/data/privacy.jsx'
 import { OnboardingProvider, useOnboarding } from '../src/lib/onboarding.js'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider.jsx'
 
@@ -61,6 +62,9 @@ function RootStack() {
           <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
           <Stack.Screen name="ask" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="learning" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="course/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="projects" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
         </Stack.Protected>
       </Stack>
@@ -85,9 +89,11 @@ export default function RootLayout() {
           <DataProvider>
             <FocusProvider>
               <AiPrefsProvider>
-                <OnboardingProvider>
-                  {fontsLoaded ? <RootStack /> : null}
-                </OnboardingProvider>
+                <PrivacyProvider>
+                  <OnboardingProvider>
+                    {fontsLoaded ? <RootStack /> : null}
+                  </OnboardingProvider>
+                </PrivacyProvider>
               </AiPrefsProvider>
             </FocusProvider>
           </DataProvider>

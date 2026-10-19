@@ -5,6 +5,7 @@
  */
 
 import { todayISO } from './analytics.js'
+import { ACCOUNT_KINDS, DEBT_DIRECTIONS } from '../data/constants.js'
 
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export const CLOCK = /^\d{1,2}:\d{2}$/
@@ -45,7 +46,13 @@ export function validateNote(input) {
   if (!title) return { ok: false, error: 'Add a title.' }
   return {
     ok: true,
-    payload: { title, body: String(input?.body ?? '').trim(), tag: input?.tag || 'Personal' },
+    payload: {
+      title,
+      body: String(input?.body ?? '').trim(),
+      tag: input?.tag || 'Personal',
+      course_id: input?.course_id || null,
+      lesson_id: input?.lesson_id || null,
+    },
   }
 }
 
@@ -64,6 +71,7 @@ export function validateTransaction(input) {
       amount: income ? Math.abs(amount) : -Math.abs(amount),
       category: input?.category || 'Other',
       account: input?.account ? String(input.account).trim() : null,
+      account_id: input?.account_id || null,
       occurred_on: date,
     },
   }
@@ -75,6 +83,35 @@ export function validateBudget(input) {
   const payload = { category: input?.category || 'Other', limit_amount: limit }
   if (input?.period) payload.period = input.period
   return { ok: true, payload }
+}
+
+export function validateAccount(input) {
+  const name = String(input?.name ?? '').trim()
+  if (!name) return { ok: false, error: 'Name the account.' }
+  const kind = ACCOUNT_KINDS.includes(input?.kind) ? input.kind : 'other'
+  const opening = parseNonNegative(input?.opening_balance ?? 0)
+  if (opening === null) return { ok: false, error: 'Opening balance cannot be negative.' }
+  return { ok: true, payload: { name, kind, opening_balance: opening } }
+}
+
+export function validateDebt(input) {
+  const counterparty = String(input?.counterparty ?? '').trim()
+  if (!counterparty) return { ok: false, error: 'Name who this is with.' }
+  const amount = parsePositive(input?.amount)
+  if (!amount) return { ok: false, error: 'Enter an amount greater than zero.' }
+  const direction = DEBT_DIRECTIONS.includes(input?.direction) ? input.direction : 'owed_to_me'
+  const due = input?.due_date
+  if (due && !isISODate(due)) return { ok: false, error: 'Use a valid due date.' }
+  return {
+    ok: true,
+    payload: {
+      counterparty,
+      amount,
+      direction,
+      note: String(input?.note ?? '').trim(),
+      due_date: due || null,
+    },
+  }
 }
 
 export function validatePlanEntry(input) {
@@ -96,22 +133,33 @@ export function validatePlanEntry(input) {
 export function validateCourse(input) {
   const name = String(input?.name ?? '').trim()
   if (!name) return { ok: false, error: 'Add a course name.' }
-  const total = parseCount(input?.total_units)
-  if (!total || total <= 0) return { ok: false, error: 'Total units must be greater than zero.' }
-  const completed = parseCount(input?.completed_units ?? 0)
-  if (completed === null || completed < 0) return { ok: false, error: 'Completed units cannot be negative.' }
-  if (completed > total) return { ok: false, error: 'Completed units cannot exceed the total.' }
   const weekly = parseNonNegative(input?.weekly_target_hours ?? 0)
   if (weekly === null) return { ok: false, error: 'Weekly target cannot be negative.' }
   return {
     ok: true,
     payload: {
       name,
-      total_units: total,
-      completed_units: completed,
-      next_label: input?.next_label ? String(input.next_label).trim() : null,
+      description: String(input?.description ?? '').trim(),
       weekly_target_hours: weekly,
     },
+  }
+}
+
+export function validateModule(input) {
+  const title = String(input?.title ?? '').trim()
+  if (!title) return { ok: false, error: 'Add a module title.' }
+  return {
+    ok: true,
+    payload: { title, description: String(input?.description ?? '').trim() },
+  }
+}
+
+export function validateLesson(input) {
+  const title = String(input?.title ?? '').trim()
+  if (!title) return { ok: false, error: 'Add a lesson title.' }
+  return {
+    ok: true,
+    payload: { title, content: String(input?.content ?? '').trim() },
   }
 }
 
@@ -162,4 +210,22 @@ export function validateSubmission(input) {
     link = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
   }
   return { ok: true, payload: { submission_text: text, submission_link: link } }
+}
+
+export const MIN_PASSWORD_LENGTH = 8
+
+export function validatePasswordChange(input) {
+  const current = String(input?.current ?? '')
+  const next = String(input?.next ?? '')
+  const confirm = String(input?.confirm ?? '')
+
+  if (!current) return { ok: false, error: 'Enter your current password.' }
+  if (next.length < MIN_PASSWORD_LENGTH) {
+    return { ok: false, error: `Use at least ${MIN_PASSWORD_LENGTH} characters.` }
+  }
+  if (next !== confirm) return { ok: false, error: 'The new passwords do not match.' }
+  if (next === current) {
+    return { ok: false, error: 'Choose a password different from your current one.' }
+  }
+  return { ok: true, payload: { current, next } }
 }

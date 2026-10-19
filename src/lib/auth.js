@@ -1,5 +1,5 @@
 /* Plain-language copy for the few auth failures a person can actually act on. */
-export function describeAuthError(error) {
+export function describeAuthError(error, fallback = 'Could not sign in. Try again.') {
   const message = String(error?.message || error || '')
 
   if (/invalid login credentials/i.test(message)) {
@@ -17,5 +17,11 @@ export function describeAuthError(error) {
   if (/invalid email/i.test(message)) {
     return 'Enter a valid email address.'
   }
-  return 'Could not sign in. Try again.'
+  if (/different from the old password|same password/i.test(message)) {
+    return 'Choose a password different from your current one.'
+  }
+  if (/password.*(at least|too short|too weak|weak|length)/i.test(message)) {
+    return 'Choose a stronger password (at least 8 characters).'
+  }
+  return fallback
 }

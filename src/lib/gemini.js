@@ -152,7 +152,7 @@ export async function extractAction({ text, context = '' }) {
 }
 
 /**
- * Ask the proxy to propose plan items (entries and/or course units).
+ * Ask the proxy to propose plan entries for a horizon.
  * @returns {Promise<{ items: Array<object>, model?: string, remaining?: number, cap?: number }>}
  * @throws {GeminiUnavailable}
  */
@@ -201,4 +201,99 @@ export async function assessSubmission({ title, brief, criteria, submission, lin
     remaining: data.remaining,
     cap: data.cap,
   }
+}
+
+/**
+ * Ask the proxy for a suggested course structure to review before saving.
+ * @returns {Promise<{ name: string, description: string, modules: Array<{ title: string, description: string, lessons: Array<{ title: string }> }>, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function generateCourse({ goal, level = '', context = '' }) {
+  const question = [
+    `Goal: ${String(goal || '').trim() || '(choose a sensible beginner-to-intermediate path)'}`,
+    `Level: ${String(level || '').trim() || '(not specified)'}`,
+  ].join('\n')
+
+  const data = await invokeProxy({
+    task: 'generate-course',
+    question: question.slice(0, 500),
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const result = data.json
+  if (!result?.name || !Array.isArray(result.modules) || !result.modules.length) {
+    throw new GeminiUnavailable('empty')
+  }
+
+  return {
+    name: String(result.name),
+    description: String(result.description || ''),
+    modules: result.modules,
+    model: data.model,
+    remaining: data.remaining,
+    cap: data.cap,
+  }
+}
+
+/**
+ * Ask the proxy to draft the content of one lesson.
+ * @returns {Promise<{ text: string, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function generateLesson({ course = '', module = '', lesson = '', context = '' }) {
+  const question = [`Course: ${course}`, `Module: ${module}`, `Lesson: ${lesson}`]
+    .join('\n')
+    .slice(0, 500)
+
+  const data = await invokeProxy({
+    task: 'generate-lesson',
+    question,
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const text = String(data.text || '').trim()
+  if (!text) throw new GeminiUnavailable('empty')
+
+  return { text, model: data.model, remaining: data.remaining, cap: data.cap }
+}
+
+/**
+ * Ask the proxy a question about the lesson the user is reading.
+ * @returns {Promise<{ text: string, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function askTutor({ question, context = '' }) {
+  const q = String(question || '').trim()
+  if (!q) throw new GeminiUnavailable('bad-request')
+
+  const data = await invokeProxy({
+    task: 'tutor',
+    question: q.slice(0, 500),
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const text = String(data.text || '').trim()
+  if (!text) throw new GeminiUnavailable('empty')
+
+  return { text, model: data.model, remaining: data.remaining, cap: data.cap }
+}
+
+/**
+ * Ask the proxy for a short quiz on the current lesson.
+ * @returns {Promise<{ questions: Array<{ prompt: string, choices: string[], answerIndex: number, explanation: string }>, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function generateQuiz({ course = '', module = '', lesson = '', context = '' }) {
+  const question = `Quiz for: ${[course, module, lesson].filter(Boolean).join(' — ')}`.slice(0, 500)
+
+  const data = await invokeProxy({
+    task: 'generate-quiz',
+    question,
+    context: String(context || '').slice(0, 4000),
+  })
+
+  const questions = Array.isArray(data.json?.questions) ? data.json.questions : []
+  if (!questions.length) throw new GeminiUnavailable('empty')
+
+  return { questions, model: data.model, remaining: data.remaining, cap: data.cap }
 }

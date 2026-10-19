@@ -9,7 +9,6 @@
 
 import {
   budgetProgress,
-  courseRow,
   courseWeekHours,
   currentStreak,
   entriesOn,
@@ -20,6 +19,8 @@ import {
   weekHours,
 } from './analytics.js'
 import { money } from './format.js'
+import { accountRows, debtTotals, openDebts } from './accounts.js'
+import { coursesTree } from './learning.js'
 import { creditBalance, dueMeta, openPenalties, sortProjects } from './projects.js'
 
 /** Aggregate spend per category for the current month (no individual transactions). */
@@ -38,7 +39,7 @@ function monthCategoryTotals(transactions) {
     .sort((a, b) => b.value - a.value)
 }
 
-export function buildFinanceContext(data) {
+export function buildFinanceContext(data, options = {}) {
   const { transactions = [], budgets = [] } = data || {}
   const { spend, income } = totalsForMonth(transactions)
   const lines = [`This month: spent ${money(spend, 0)}, income ${money(income, 0)}.`]
@@ -50,6 +51,39 @@ export function buildFinanceContext(data) {
     lines.push(`Budgets: ${money(totalLimit, 0)} total, ${money(totalSpent, 0)} used, ${money(totalLimit - totalSpent, 0)} remaining.`)
   } else {
     lines.push('No monthly budgets are set.')
+  }
+
+  const accounts = accountRows(data)
+  if (accounts.length) {
+    if (options.hidden) {
+      lines.push(`The user has ${accounts.length} tracked accounts, but their balances are hidden right now.`)
+    } else {
+      lines.push('Accounts (opening balance plus spending tagged to each):')
+      for (const account of accounts.slice(0, 8)) {
+        lines.push(`- ${account.name}: ${money(account.balance, 0)}, ${money(account.income, 0)} in this month`)
+      }
+    }
+  } else {
+    lines.push('No accounts are tracked.')
+  }
+
+  const open = openDebts(data?.debts)
+  if (open.length) {
+    const totals = debtTotals(data?.debts)
+    if (options.hidden) {
+      lines.push(`The user has ${open.length} open debts, but the amounts are hidden right now.`)
+    } else {
+      lines.push(
+        `Open debts: ${money(totals.owedToMe, 0)} owed to the user, ${money(totals.iOwe, 0)} owed by the user.`,
+      )
+      for (const debt of open.slice(0, 8)) {
+        lines.push(
+          `- ${debt.counterparty}: ${debt.direction === 'i_owe' ? 'user owes' : 'owes user'} ${money(debt.amount, 0)}${debt.due_date ? `, due ${debt.due_date}` : ''}`,
+        )
+      }
+    }
+  } else {
+    lines.push('No open debts.')
   }
 
   const categories = monthCategoryTotals(transactions)
@@ -67,20 +101,19 @@ export function buildFinanceContext(data) {
 }
 
 export function buildLearningContext(data) {
-  const { courses = [], sessions = [] } = data || {}
+  const { sessions = [] } = data || {}
   const lines = [
     `Study this week: ${weekHours(sessions)}h. Current streak: ${currentStreak(sessions)} days.`,
   ]
 
-  const active = courses.filter((course) => course.active !== false)
-  if (active.length) {
+  const trees = coursesTree(data)
+  if (trees.length) {
     lines.push('Courses:')
-    for (const raw of active.slice(0, 8)) {
-      const row = courseRow(raw)
-      const logged = courseWeekHours(sessions, raw.id)
-      const target = Number(raw.weekly_target_hours) || 0
-      const parts = [`${row.name}: ${row.detail} (${row.progress}%)`]
-      if (row.next) parts.push(`next: ${row.next}`)
+    for (const tree of trees.slice(0, 8)) {
+      const logged = courseWeekHours(sessions, tree.id)
+      const target = Number(tree.course.weekly_target_hours) || 0
+      const parts = [`${tree.name}: ${tree.detail} (${tree.pct}%)`]
+      if (tree.next) parts.push(`next: ${tree.next.title}`)
       if (target > 0) parts.push(`weekly target ${target}h, ${logged}h logged`)
       lines.push(`- ${parts.join(', ')}`)
     }
@@ -169,8 +202,8 @@ const BUILDERS = {
   projects: buildProjectsContext,
 }
 
-export function buildContextFor(domain, data) {
+export function buildContextFor(domain, data, options = {}) {
   const builder = BUILDERS[domain]
   if (!builder) return { context: '', sources: [] }
-  return builder(data)
+  return builder(data, options)
 }

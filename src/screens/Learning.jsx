@@ -1,6 +1,7 @@
+import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Check, PencilSimple, Play, Sparkle, Trash } from '../icons.js'
+import { BookOpen, PencilSimple, Play, Plus, Sparkle, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
@@ -8,7 +9,7 @@ import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
-import CourseUnits from '../components/assistant/CourseUnits.jsx'
+import GenerateCourse from '../components/assistant/GenerateCourse.jsx'
 import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
 import CourseForm from '../components/forms/CourseForm.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
@@ -20,9 +21,9 @@ import { LEARNING_GOAL_HOURS } from '../data/constants.js'
 import { formatElapsed, useFocus } from '../data/focus.jsx'
 import { useData } from '../data/store.jsx'
 import { confirmDelete } from '../lib/alerts.js'
+import { continueTarget, courseProgress, coursesTree, learningStats } from '../lib/learning.js'
 import { useRowActions } from '../lib/rowActions.jsx'
 import {
-  courseRow,
   courseWeekHours,
   currentStreak,
   formatDateShort,
@@ -35,6 +36,7 @@ import { useTheme } from '../theme/ThemeProvider.jsx'
 
 export default function Learning() {
   const { c, fonts, text } = useTheme()
+  const router = useRouter()
   const { data, loading, error, reload, deleteCourse, deleteSession } = useData()
   const { active, session, elapsedMs, start, stop, cancel } = useFocus()
   const [courseOpen, setCourseOpen] = useState(false)
@@ -44,7 +46,7 @@ export default function Learning() {
   const [sessionDefaults, setSessionDefaults] = useState(null)
   const [planOpen, setPlanOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
-  const [unitsCourse, setUnitsCourse] = useState(null)
+  const [genOpen, setGenOpen] = useState(false)
   const { open, sheet } = useRowActions()
 
   const openNewCourse = () => {
@@ -63,25 +65,28 @@ export default function Learning() {
     setSessionOpen(true)
   }
 
-  const courseActions = (id) => {
-    const course = data.courses.find((item) => item.id === id)
-    if (!course) return
+  const courseMenu = (course) =>
     open({
       title: course.name,
       subtitle: 'Course',
       actions: [
-        { key: 'units', label: 'Units', icon: Check, onPress: () => setUnitsCourse(course) },
+        {
+          key: 'study',
+          label: 'Start focus',
+          icon: Play,
+          onPress: () => start({ courseId: course.id, title: course.name }),
+        },
         { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditCourse(course) },
         {
           key: 'delete',
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(course.name, () => deleteCourse(id).catch(() => {})),
+          onPress: () =>
+            confirmDelete(course.name, () => deleteCourse(course.id).catch(() => {})),
         },
       ],
     })
-  }
 
   const sessionActions = (id) => {
     const record = data.sessions.find((item) => item.id === id)
@@ -118,7 +123,7 @@ export default function Learning() {
 
   if (loading) {
     return (
-      <Screen title="Learning" subtitle="Courses, study hours and streaks" left="back">
+      <Screen title="Learning" subtitle="Courses, lessons and study hours" left="back" tabbed={false}>
         <Loading label="Loading learning" />
       </Screen>
     )
@@ -126,7 +131,7 @@ export default function Learning() {
 
   if (error) {
     return (
-      <Screen title="Learning" subtitle="Courses, study hours and streaks" left="back">
+      <Screen title="Learning" subtitle="Courses, lessons and study hours" left="back" tabbed={false}>
         <ErrorState error={error} onRetry={reload} />
       </Screen>
     )
@@ -136,17 +141,158 @@ export default function Learning() {
   const hours = weekHours(data.sessions)
   const streak = currentStreak(data.sessions)
   const maxHours = Math.max(...week.map((day) => day.hours), 1)
-  const courses = data.courses.filter((course) => course.active !== false)
+  const trees = coursesTree(data)
+  const stats = learningStats(data)
+  const target = continueTarget(data)
+  const targetProgress = target ? courseProgress(target.course.id, data) : null
   const blocks = todayStudyBlocks(data.planner)
   const recent = recentSessions(data.sessions, 5)
   const courseName = (id) => data.courses.find((course) => course.id === id)?.name
 
   return (
-    <Screen title="Learning" subtitle="Courses, study hours and streaks" left="back">
+    <Screen title="Learning" subtitle="Courses, lessons and study hours" left="back">
+      {target ? (
+        <Section title="Continue learning">
+          <Card padded>
+            <View style={{ gap: 12 }}>
+              <View style={{ gap: 3 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}
+                >
+                  {target.course.name}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}
+                >
+                  {target.module.title} · {target.lesson.title}
+                </Text>
+              </View>
+              <ProgressBar label="Course progress" value={targetProgress.pct} percentOnly />
+              <Button
+                variant="primary"
+                icon={Play}
+                onPress={() => router.push(`/lesson/${target.lesson.id}`)}
+              >
+                Continue
+              </Button>
+            </View>
+          </Card>
+        </Section>
+      ) : null}
+
       <View style={{ flexDirection: 'row', gap: 16 }}>
-        <StatCard label="Current streak" value={`${streak} days`} hint="Log a session daily" />
-        <StatCard label="This week" value={`${hours}h`} hint={`of ${LEARNING_GOAL_HOURS}h goal`} />
+        <StatCard
+          label="Active courses"
+          value={String(stats.activeCourses)}
+          hint={`${stats.courses} total`}
+        />
+        <StatCard
+          label="Lessons done"
+          value={`${stats.completedLessons} / ${stats.totalLessons}`}
+          hint={`${stats.pct}% overall`}
+        />
       </View>
+
+      <Section
+        title="My courses"
+        action={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button size="sm" variant="ghost" icon={Sparkle} onPress={() => setGenOpen(true)}>
+              Generate
+            </Button>
+            <Button size="sm" variant="ghost" onPress={openNewCourse}>
+              Add
+            </Button>
+          </View>
+        }
+      >
+        <Card padded={!trees.length}>
+          {trees.length ? (
+            trees.map((tree, index) => {
+              const logged = courseWeekHours(data.sessions, tree.id)
+              const targetHours = Number(tree.course.weekly_target_hours) || 0
+              const weekPct = targetHours > 0 ? Math.min(100, Math.round((logged / targetHours) * 100)) : 0
+              return (
+                <Pressable
+                  key={tree.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tree.name}, ${tree.detail}`}
+                  onPress={() => router.push(`/course/${tree.id}`)}
+                  style={({ pressed }) => ({
+                    gap: 10,
+                    paddingHorizontal: 16,
+                    paddingVertical: 16,
+                    borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+                    borderTopColor: c.line,
+                    backgroundColor: pressed ? c.overline : 'transparent',
+                  })}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ flex: 1, fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}
+                    >
+                      {tree.name}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+                      {tree.detail}
+                    </Text>
+                    <RowMenuButton
+                      compact
+                      accessibilityLabel={`${tree.name}, more options`}
+                      onPress={() => courseMenu(tree.course)}
+                    />
+                  </View>
+                  {tree.description ? (
+                    <Text
+                      numberOfLines={2}
+                      style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
+                    >
+                      {tree.description}
+                    </Text>
+                  ) : null}
+                  <ProgressBar label="Progress" value={tree.pct} percentOnly />
+                  {targetHours > 0 ? (
+                    <ProgressBar
+                      label={`This week · ${logged}h of ${targetHours}h`}
+                      value={weekPct}
+                      percentOnly
+                    />
+                  ) : null}
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.mutedForeground }}
+                  >
+                    {tree.next
+                      ? `Next · ${tree.next.title}`
+                      : tree.total
+                        ? 'All lessons complete'
+                        : 'No lessons yet'}
+                  </Text>
+                </Pressable>
+              )
+            })
+          ) : (
+            <EmptyState
+              icon={BookOpen}
+              title="No courses yet"
+              description="Build a course out of modules and lessons, then work through it. Track every lesson as you finish it."
+              action={
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Button size="sm" variant="primary" onPress={openNewCourse}>
+                    New course
+                  </Button>
+                  <Button size="sm" variant="secondary" icon={Sparkle} onPress={() => setGenOpen(true)}>
+                    Generate
+                  </Button>
+                </View>
+              }
+            />
+          )}
+        </Card>
+      </Section>
 
       <Section title="Focus">
         <Card padded>
@@ -249,7 +395,14 @@ export default function Learning() {
         </Card>
       </Section>
 
-      <Section title="Study hours">
+      <Section
+        title="Study hours"
+        action={
+          <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+            {streak} day streak · {hours}h of {LEARNING_GOAL_HOURS}h
+          </Text>
+        }
+      >
         <Card padded>
           <View
             style={{ height: 120, flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}
@@ -289,99 +442,6 @@ export default function Learning() {
       </Section>
 
       <Section
-        title="Active courses"
-        action={
-          <Button size="sm" variant="ghost" onPress={openNewCourse}>
-            Add
-          </Button>
-        }
-      >
-        <Card padded={!courses.length}>
-          {courses.length ? (
-            courses.map((raw, index) => {
-              const course = courseRow(raw)
-              const logged = courseWeekHours(data.sessions, course.id)
-              const target = Number(raw.weekly_target_hours) || 0
-              const pct = target > 0 ? Math.min(100, Math.round((logged / target) * 100)) : 0
-              return (
-                <Pressable
-                  key={course.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={course.name}
-                  onPress={() => openEditCourse(raw)}
-                  style={({ pressed }) => ({
-                    gap: 10,
-                    paddingHorizontal: 16,
-                    paddingVertical: 16,
-                    borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
-                    borderTopColor: c.line,
-                    backgroundColor: pressed ? c.overline : 'transparent',
-                  })}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text
-                      numberOfLines={1}
-                      style={{ flex: 1, fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}
-                    >
-                      {course.name}
-                    </Text>
-                    <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                      {course.detail}
-                    </Text>
-                    <RowMenuButton
-                      compact
-                      accessibilityLabel={`${course.name}, more options`}
-                      onPress={() => courseActions(course.id)}
-                    />
-                  </View>
-                  <ProgressBar label="Progress" value={course.progress} percentOnly />
-                  {target > 0 ? (
-                    <ProgressBar
-                      label={`This week · ${logged}h of ${target}h`}
-                      value={pct}
-                      percentOnly
-                    />
-                  ) : (
-                    <Text style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.mutedForeground }}>
-                      {logged}h this week
-                    </Text>
-                  )}
-                  {course.next ? (
-                    <Text
-                      numberOfLines={1}
-                      style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.mutedForeground }}
-                    >
-                      Next · {course.next}
-                    </Text>
-                  ) : null}
-                  <View style={{ flexDirection: 'row' }}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      icon={Play}
-                      onPress={() => start({ courseId: course.id, title: course.name })}
-                    >
-                      Study
-                    </Button>
-                  </View>
-                </Pressable>
-              )
-            })
-          ) : (
-            <EmptyState
-              title="No courses yet"
-              description="Add a course to track units, set a weekly target and study toward it."
-              action={
-                <Button size="sm" variant="primary" onPress={openNewCourse}>
-                  Add a course
-                </Button>
-              }
-            />
-          )}
-        </Card>
-      </Section>
-
-      <Section
         title="Recent sessions"
         action={
           <Button size="sm" variant="ghost" onPress={() => openLog()}>
@@ -395,7 +455,7 @@ export default function Learning() {
               <Pressable
                 key={record.id}
                 accessibilityRole="button"
-                accessibilityLabel={`Session`}
+                accessibilityLabel="Session"
                 onPress={() => {
                   setSessionRecord(record)
                   setSessionDefaults(null)
@@ -423,7 +483,7 @@ export default function Learning() {
                   </Text>
                   <RowMenuButton
                     compact
-                    accessibilityLabel={`Session, more options`}
+                    accessibilityLabel="Session, more options"
                     onPress={() => sessionActions(record.id)}
                   />
                 </View>
@@ -469,17 +529,9 @@ export default function Learning() {
           setSessionDefaults(null)
         }}
       />
-      <PlanForm
-        visible={planOpen}
-        tag="Study"
-        onClose={() => setPlanOpen(false)}
-      />
+      <PlanForm visible={planOpen} tag="Study" onClose={() => setPlanOpen(false)} />
       <PlanWithAi visible={aiOpen} defaultScope="study" onClose={() => setAiOpen(false)} />
-      <CourseUnits
-        visible={Boolean(unitsCourse)}
-        course={unitsCourse}
-        onClose={() => setUnitsCourse(null)}
-      />
+      <GenerateCourse visible={genOpen} onClose={() => setGenOpen(false)} />
       {sheet}
     </Screen>
   )

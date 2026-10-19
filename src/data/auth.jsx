@@ -55,6 +55,32 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }, [])
 
+  const changePassword = useCallback(
+    async (currentPassword, nextPassword) => {
+      const email = session?.user?.email
+      if (!email) throw new Error('This account has no email address.')
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: String(currentPassword ?? ''),
+      })
+      if (verifyError) {
+        if (/invalid login credentials/i.test(String(verifyError.message || ''))) {
+          const error = new Error('Current password is incorrect.')
+          error.code = 'current_password'
+          throw error
+        }
+        throw verifyError
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: String(nextPassword ?? ''),
+      })
+      if (updateError) throw updateError
+    },
+    [session],
+  )
+
   const value = useMemo(
     () => ({
       session,
@@ -63,8 +89,9 @@ export function AuthProvider({ children }) {
       loading,
       signIn,
       signOut,
+      changePassword,
     }),
-    [session, loading, signIn, signOut],
+    [session, loading, signIn, signOut, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

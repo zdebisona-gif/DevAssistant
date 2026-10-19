@@ -133,7 +133,7 @@ export default function PlanWithAi({ visible, defaultScope = 'general', onClose 
       visible={visible}
       onClose={onClose}
       title="Plan with AI"
-      subtitle={scope === 'study' ? 'Study blocks and units' : 'Entries for your week'}
+      subtitle={scope === 'study' ? 'Study blocks for your week' : 'Entries for your week'}
     >
       {hasCourses ? (
         <View style={{ gap: 8 }}>

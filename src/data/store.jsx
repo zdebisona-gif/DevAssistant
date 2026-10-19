@@ -9,6 +9,7 @@
 import { AppState } from 'react-native'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as db from '../lib/db.js'
+import { taggedNet } from '../lib/accounts.js'
 import { useAuth } from './auth.jsx'
 
 const EMPTY = {
@@ -16,11 +17,14 @@ const EMPTY = {
   transactions: [],
   notes: [],
   courses: [],
-  units: [],
+  modules: [],
+  lessons: [],
   sessions: [],
   planner: [],
   projects: [],
   penalties: [],
+  accounts: [],
+  debts: [],
 }
 
 const DataContext = createContext(null)
@@ -88,21 +92,54 @@ export function DataProvider({ children }) {
       createCourse: (row) => mutate(() => db.addCourse(row)),
       updateCourse: (id, patch) => mutate(() => db.updateCourse(id, patch)),
       deleteCourse: (id) => mutate(() => db.deleteCourse(id)),
-      createCourseUnit: (row) => mutate(() => db.addCourseUnit(row)),
-      updateCourseUnit: (id, patch) => mutate(() => db.updateCourseUnit(id, patch)),
-      deleteCourseUnit: (id) => mutate(() => db.deleteCourseUnit(id)),
-      completeCourseUnit: (id, done) =>
+      createModule: (row) => mutate(() => db.addModule(row)),
+      updateModule: (id, patch) => mutate(() => db.updateModule(id, patch)),
+      deleteModule: (id) => mutate(() => db.deleteModule(id)),
+      createLesson: (row) => mutate(() => db.addLesson(row)),
+      updateLesson: (id, patch) => mutate(() => db.updateLesson(id, patch)),
+      deleteLesson: (id) => mutate(() => db.deleteLesson(id)),
+      toggleLesson: (id, done) => mutate(() => db.updateLesson(id, { done })),
+      /* Recency only: patch locally and write in the background, so opening a lesson
+         never waits on a network round-trip. */
+      touchLesson: (id) => {
+        if (!uid) return
+        const opened_at = new Date().toISOString()
+        setData((prev) => ({
+          ...prev,
+          lessons: prev.lessons.map((lesson) =>
+            lesson.id === id ? { ...lesson, opened_at } : lesson,
+          ),
+        }))
+        db.updateLesson(id, { opened_at }).catch(() => {})
+      },
+      createCourseTree: (tree) =>
         mutate(async () => {
-          const unit = data.units.find((item) => item.id === id)
-          await db.updateCourseUnit(id, { done })
-          const course = unit ? data.courses.find((item) => item.id === unit.course_id) : null
-          if (course) {
-            const total = Number(course.total_units) || 0
-            const next = Math.max(0, (Number(course.completed_units) || 0) + (done ? 1 : -1))
-            await db.updateCourse(course.id, {
-              completed_units: total > 0 ? Math.min(next, total) : next,
+          const course = await db.addCourse({
+            name: tree.name,
+            description: tree.description ?? '',
+            weekly_target_hours: tree.weekly_target_hours ?? 0,
+          })
+          let modulePosition = 0
+          for (const mod of tree.modules ?? []) {
+            const saved = await db.addModule({
+              course_id: course.id,
+              title: mod.title,
+              description: mod.description ?? '',
+              position: modulePosition,
             })
+            modulePosition += 1
+            let lessonPosition = 0
+            for (const lesson of mod.lessons ?? []) {
+              await db.addLesson({
+                module_id: saved.id,
+                title: lesson.title,
+                content: lesson.content ?? '',
+                position: lessonPosition,
+              })
+              lessonPosition += 1
+            }
           }
+          return course
         }),
       createSession: (row) => mutate(() => db.addSession(row)),
       updateSession: (id, patch) => mutate(() => db.updateSession(id, patch)),
@@ -114,6 +151,25 @@ export function DataProvider({ children }) {
       createProject: (row) => mutate(() => db.addProject(row)),
       updateProject: (id, patch) => mutate(() => db.updateProject(id, patch)),
       deleteProject: (id) => mutate(() => db.deleteProject(id)),
+      createAccount: (row) => mutate(() => db.addAccount(row)),
+      updateAccount: (id, patch) => mutate(() => db.updateAccount(id, patch)),
+      deleteAccount: (id) => mutate(() => db.deleteAccount(id)),
+      /* The balance is derived, so an adjustment moves the stored opening balance. */
+      adjustOpeningBalance: (id, delta) => {
+        const account = data.accounts.find((row) => row.id === id)
+        const next = (Number(account?.opening_balance) || 0) + delta
+        return mutate(() => db.updateAccount(id, { opening_balance: next }))
+      },
+      /* Reconcile: rewrite the opening balance so the live balance equals what the user sees. */
+      reconcileAccount: (id, displayed) =>
+        mutate(() => db.updateAccount(id, { opening_balance: displayed - taggedNet(data.transactions, id) })),
+      createDebt: (row) => mutate(() => db.addDebt(row)),
+      updateDebt: (id, patch) => mutate(() => db.updateDebt(id, patch)),
+      deleteDebt: (id) => mutate(() => db.deleteDebt(id)),
+      settleDebt: (id, settled = true) =>
+        mutate(() =>
+          db.updateDebt(id, { settled, settled_at: settled ? new Date().toISOString() : null }),
+        ),
       createPenalty: (row) => mutate(() => db.addPenalty(row)),
       atonePenalty: (penalty) =>
         mutate(async () => {

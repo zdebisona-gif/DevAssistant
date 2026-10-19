@@ -10,7 +10,7 @@
 const DOMAIN_RULES = [
   {
     key: 'finance',
-    re: /\b(spend|spent|spending|budget|budgets|money|expense|expenses|income|salary|earn|earnings|save|saving|savings|afford|bill|bills|cost|costs|financ\w*|cheaper|overspend|overspending)\b/i,
+    re: /\b(spend|spent|spending|budget|budgets|money|expense|expenses|income|salary|earn|earnings|save|saving|savings|afford|bill|bills|cost|costs|financ\w*|cheaper|overspend|overspending|owe|owes|owed|debt|debts|lent|borrow|borrowed|iou|account|accounts|balance|balances|assets|gcash|bdo)\b/i,
   },
   {
     key: 'projects',

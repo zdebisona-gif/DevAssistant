@@ -9,26 +9,31 @@ import { useData } from '../../data/store.jsx'
 import { validateNote } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
-export default function NoteForm({ visible, onClose, record }) {
+export default function NoteForm({ visible, onClose, record, defaults = null }) {
   const { c, fonts, text } = useTheme()
   const { createNote, updateNote } = useData()
   const editing = Boolean(record)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tag, setTag] = useState(NOTE_TAGS[0])
+  const [link, setLink] = useState({ course_id: null, lesson_id: null })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!visible) return
-    setTitle(record?.title ?? '')
-    setBody(record?.body ?? '')
-    setTag(record?.tag ?? NOTE_TAGS[0])
+    setTitle(record?.title ?? defaults?.title ?? '')
+    setBody(record?.body ?? defaults?.body ?? '')
+    setTag(record?.tag ?? defaults?.tag ?? NOTE_TAGS[0])
+    setLink({
+      course_id: record?.course_id ?? defaults?.course_id ?? null,
+      lesson_id: record?.lesson_id ?? defaults?.lesson_id ?? null,
+    })
     setError(null)
     setSaving(false)
-  }, [visible, record])
+  }, [visible, record, defaults?.title, defaults?.body, defaults?.tag, defaults?.course_id, defaults?.lesson_id])
 
-  const result = validateNote({ title, body, tag })
+  const result = validateNote({ title, body, tag, ...link })
   const valid = result.ok
 
   const submit = async () => {

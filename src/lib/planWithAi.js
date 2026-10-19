@@ -1,15 +1,15 @@
 /*
  * "Plan with AI" (Stage 2.5): turn a goal (or the current week) into proposed plan
- * entries and, in study scope, course units. Proposals are always previewed and
- * confirmed before anything is written; execution goes through useData() services.
+ * entries. Proposals are always previewed and confirmed before anything is written;
+ * execution goes through useData() services.
  *
  * Context sent to the proxy is minimum-necessary: the goal text, the date range,
- * existing planner titles/times in range, and (study scope) course names and progress.
- * Never notes, transactions or account data.
+ * existing planner titles/times in range, and (study scope) course names and derived
+ * lesson progress. Never notes, transactions or account data.
  */
 
+import { courseTree, coursesTree } from './learning.js'
 import {
-  courseRow,
   courseWeekHours,
   startOfWeek,
   toISODate,
@@ -78,15 +78,14 @@ export function buildPlanContext({ scope, horizon, goal, data }) {
   }
 
   if (scope === 'study') {
-    const active = (data.courses || []).filter((course) => course.active !== false)
-    if (active.length) {
+    const trees = coursesTree(data)
+    if (trees.length) {
       lines.push('Courses:')
-      for (const course of active.slice(0, 8)) {
-        const row = courseRow(course)
-        const logged = courseWeekHours(data.sessions || [], course.id)
-        const target = Number(course.weekly_target_hours) || 0
-        const bits = [`${row.name}: ${row.detail} (${row.progress}%)`]
-        if (row.next) bits.push(`next: ${row.next}`)
+      for (const tree of trees.slice(0, 8)) {
+        const logged = courseWeekHours(data.sessions || [], tree.id)
+        const target = Number(tree.course.weekly_target_hours) || 0
+        const bits = [`${tree.name}: ${tree.detail} (${tree.pct}%)`]
+        if (tree.next) bits.push(`next: ${tree.next.title}`)
         if (target > 0) bits.push(`weekly target ${target}h (${logged}h logged)`)
         lines.push(`- ${bits.join(', ')}`)
       }
@@ -96,14 +95,6 @@ export function buildPlanContext({ scope, horizon, goal, data }) {
   }
 
   return lines.join('\n')
-}
-
-function resolveCourse(courses, query) {
-  const q = normalize(query)
-  if (!q) return null
-  const exact = courses.find((course) => normalize(course.name) === q)
-  if (exact) return exact
-  return courses.find((course) => normalize(course.name).includes(q) || q.includes(normalize(course.name))) || null
 }
 
 function normalizeTag(value, fallback) {
@@ -117,33 +108,10 @@ export function normalizeItems(items, data, scope) {
   const existingEntries = new Set(
     (data.planner || []).map((entry) => `${entry.entry_date}|${normalize(entry.title)}`),
   )
-  const existingUnits = new Set((data.units || []).map((unit) => `${unit.course_id}|${normalize(unit.title)}`))
   const proposedEntries = new Set()
-  const proposedUnits = new Set()
   const out = []
 
   ;(items || []).slice(0, MAX_ITEMS).forEach((raw, index) => {
-    const kind = raw?.kind === 'unit' ? 'unit' : 'entry'
-
-    if (kind === 'unit') {
-      if (scope !== 'study') return
-      const course = resolveCourse(data.courses || [], raw?.course)
-      const title = String(raw?.title || '').trim().slice(0, 80)
-      if (!course || !title) return
-      const key = `${course.id}|${normalize(title)}`
-      if (existingUnits.has(key) || proposedUnits.has(key)) return
-      proposedUnits.add(key)
-      out.push({
-        key: `u${index}`,
-        kind: 'unit',
-        title,
-        course: course.name,
-        courseId: course.id,
-        payload: { course_id: course.id, title, position: 0 },
-      })
-      return
-    }
-
     const checked = validatePlanEntry({
       title: raw?.title,
       entry_date: raw?.date,
@@ -201,25 +169,16 @@ export function localStudyPlan(data) {
 /** Write the selected proposals through the data services. */
 export async function runPlan(services, items) {
   let entries = 0
-  let units = 0
   for (const item of items) {
-    if (item.kind === 'unit') {
-      await services.createCourseUnit(item.payload)
-      units += 1
-    } else {
-      await services.createPlanEntry(item.payload)
-      entries += 1
-    }
+    await services.createPlanEntry(item.payload)
+    entries += 1
   }
-  return { entries, units }
+  return { entries }
 }
 
-export function summarizeResult({ entries, units }) {
-  const parts = []
-  if (entries) parts.push(`${entries} ${entries === 1 ? 'entry' : 'entries'}`)
-  if (units) parts.push(`${units} ${units === 1 ? 'unit' : 'units'}`)
-  if (!parts.length) return 'Nothing was added.'
-  return `Added ${parts.join(' and ')}.`
+export function summarizeResult({ entries }) {
+  if (!entries) return 'Nothing was added.'
+  return `Added ${entries} ${entries === 1 ? 'entry' : 'entries'}.`
 }
 
 const PLAN_REQUEST =

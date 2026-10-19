@@ -11,14 +11,17 @@
  */
 
 import { budgetsForMonth, formatDateShort, toISODate, todayISO } from './analytics.js'
+import { accountsFor, accountBalance, openDebts } from './accounts.js'
 import { MONEY_CATEGORIES, NOTE_TAGS, PLAN_TAGS } from '../data/constants.js'
 import { money } from './format.js'
+import { courseLessons } from './learning.js'
 import {
   isISODate,
   normalizeTime,
   parsePositive,
   validateBudget,
   validateCourse,
+  validateDebt,
   validateNote,
   validatePlanEntry,
   validateProject,
@@ -38,10 +41,14 @@ export const ALLOWED_ACTIONS = [
   'update_note',
   'delete_note',
   'create_course',
-  'add_course_unit',
-  'complete_course_unit',
-  'delete_course_unit',
+  'add_lesson',
+  'complete_lesson',
+  'delete_lesson',
   'create_project',
+  'adjust_account',
+  'add_debt',
+  'settle_debt',
+  'delete_debt',
 ]
 
 const ALLOWED = new Set(ALLOWED_ACTIONS)
@@ -117,12 +124,15 @@ function timeFrom(raw) {
 }
 
 const CATEGORY_HINTS = [
-  ['Groceries', /grocer|supermarket|market|milk|egg|bread/],
-  ['Food & Dining', /coffee|restaurant|lunch|dinner|breakfast|food|eat|cafe|pizza|snack/],
-  ['Transport', /uber|grab|taxi|bus|train|fare|fuel|gas|petrol|parking/],
-  ['Bills & Utilities', /bill|electric|water|internet|phone|rent|utilit|wifi/],
-  ['Shopping', /shop|clothes|shoes|amazon|store/],
-  ['Entertainment', /movie|cinema|netflix|game|concert/],
+  ['Groceries', /grocer|supermarket|market|milk|egg|bread|puregold|sm hyper/],
+  [
+    'Food & Dining',
+    /coffee|restaurant|lunch|dinner|breakfast|food|eat|cafe|pizza|snack|jollibee|jolibee|mcdo|mcdonald|chowking|greenwich|jabee|shakey/,
+  ],
+  ['Transport', /uber|grab|angkas|joyride|taxi|bus|train|fare|fuel|gas|petrol|parking/],
+  ['Bills & Utilities', /bill|electric|water|internet|phone|rent|utilit|wifi|meralco|pldt|globe|smart/],
+  ['Shopping', /shop|clothes|shoes|amazon|store|lazada|shopee|zalora/],
+  ['Entertainment', /movie|cinema|netflix|game|concert|spotify/],
   ['Salary', /salary|paycheck|wage|income/],
 ]
 
@@ -185,6 +195,27 @@ function resolveTarget(rows, query, labelOf) {
   return { ok: true, row: scored[0].row }
 }
 
+/* An account name is optional metadata on a transaction, so an ambiguous or unknown name
+   falls back to free text instead of failing the whole action. */
+function bestAccount(data, query) {
+  const raw = String(query || '').trim()
+  if (!raw) return null
+  const found = resolveTarget(accountsFor(data), raw, (row) => row.name)
+  return found.ok ? found.row : null
+}
+
+/** "jollibee using gcash" → { merchant: 'Jollibee', account: <row|null> }. */
+const ACCOUNT_SUFFIX = /\s+(?:using|from|via|through|paid with|with|in)\s+(?:my\s+)?(.+)$/i
+
+function splitAccount(text, data) {
+  const raw = String(text || '').trim()
+  const match = raw.match(ACCOUNT_SUFFIX)
+  if (!match) return { text: raw, account: null }
+  const account = bestAccount(data, match[1])
+  if (!account) return { text: raw, account: null }
+  return { text: raw.slice(0, match.index).trim(), account }
+}
+
 /* ------------------------------------------------------------------ */
 /* Proposal builders                                                   */
 /* ------------------------------------------------------------------ */
@@ -202,23 +233,28 @@ const FIELD_LABELS = {
   entry_date: 'Date',
   start_time: 'Time',
   limit_amount: 'Monthly limit',
+  counterparty: 'With',
 }
 
 function fieldLabel(key) {
   return FIELD_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1)
 }
 
-function buildCreateTransaction(args) {
+function buildCreateTransaction(args, data) {
   const income = args.type === 'income'
   const category =
     normalizeCategory(args.category) ||
     (income ? 'Salary' : categoryHint(args.merchant) || 'Other')
+  const account = args.account_id
+    ? accountsFor(data).find((row) => row.id === args.account_id) || null
+    : bestAccount(data, args.account)
   const checked = validateTransaction({
     merchant: args.merchant,
     amount: args.amount,
     type: income ? 'income' : 'expense',
     category,
-    account: args.account,
+    account: account ? account.name : args.account,
+    account_id: account ? account.id : null,
     occurred_on: args.date,
   })
   if (!checked.ok) return fail(checked.error)
@@ -231,6 +267,7 @@ function buildCreateTransaction(args) {
       { label: 'Amount', value: money(Math.abs(payload.amount)) },
       { label: 'Merchant', value: payload.merchant },
       { label: 'Category', value: payload.category },
+      { label: 'Account', value: payload.account || 'None' },
       { label: 'Date', value: formatDateShort(payload.occurred_on) },
     ],
   })
@@ -427,10 +464,8 @@ function buildDeleteNote(args, data) {
 function buildCreateCourse(args) {
   const checked = validateCourse({
     name: args.name || args.title,
-    total_units: args.units || args.total_units,
-    completed_units: 0,
+    description: args.description,
     weekly_target_hours: args.weekly_target || 0,
-    next_label: args.next,
   })
   if (!checked.ok) return fail(checked.error)
   const payload = checked.payload
@@ -439,8 +474,10 @@ function buildCreateCourse(args) {
     summary: `Add the course “${payload.name}”`,
     details: [
       { label: 'Course', value: payload.name },
-      { label: 'Total units', value: String(payload.total_units) },
-      ...(payload.weekly_target_hours ? [{ label: 'Weekly target', value: `${payload.weekly_target_hours}h` }] : []),
+      ...(payload.description ? [{ label: 'Description', value: payload.description }] : []),
+      ...(payload.weekly_target_hours
+        ? [{ label: 'Weekly target', value: `${payload.weekly_target_hours}h` }]
+        : []),
     ],
   })
 }
@@ -450,53 +487,62 @@ function resolveCourseNamed(data, query) {
   return resolveTarget(active, query, (course) => course.name)
 }
 
-function buildAddCourseUnit(args, data) {
+function modulesOf(data, courseId) {
+  return (data.modules || [])
+    .filter((mod) => mod.course_id === courseId)
+    .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0))
+}
+
+function resolveLessonNamed(data, courseId, query) {
+  const moduleIds = new Set(modulesOf(data, courseId).map((mod) => mod.id))
+  const lessons = (data.lessons || []).filter((lesson) => moduleIds.has(lesson.module_id))
+  return resolveTarget(lessons, query, (lesson) => lesson.title)
+}
+
+function buildAddLesson(args, data) {
   const found = resolveCourseNamed(data, args.course || args.target)
   if (!found.ok) return found
-  const title = String(args.unit || args.title || '').trim()
-  if (!title) return fail('Name the unit to add.')
-  const position = (data.units || []).filter((unit) => unit.course_id === found.row.id).length
-  return ok('add_course_unit', 'local', {
-    payload: { course_id: found.row.id, title, position },
-    summary: `Add the unit “${title}” to ${found.row.name}`,
+  const title = String(args.lesson || args.title || '').trim()
+  if (!title) return fail('Name the lesson to add.')
+  const module = modulesOf(data, found.row.id)[0] || null
+  return ok('add_lesson', 'local', {
+    target: { courseId: found.row.id, moduleId: module?.id ?? null },
+    payload: { title, position: courseLessons(found.row.id, data).length },
+    summary: `Add the lesson “${title}” to ${found.row.name}`,
     details: [
       { label: 'Course', value: found.row.name },
-      { label: 'Unit', value: title },
+      { label: 'Lesson', value: title },
+      { label: 'Module', value: module ? module.title : 'New “Lessons” module' },
     ],
   })
 }
 
-function resolveUnitNamed(data, courseId, query) {
-  const units = (data.units || []).filter((unit) => unit.course_id === courseId)
-  return resolveTarget(units, query, (unit) => unit.title)
-}
-
-function buildCompleteCourseUnit(args, data) {
+function buildCompleteLesson(args, data) {
   const course = resolveCourseNamed(data, args.course || args.target)
   if (!course.ok) return course
-  const unit = resolveUnitNamed(data, course.row.id, args.unit || args.target)
-  if (!unit.ok) return unit
-  return ok('complete_course_unit', 'local', {
-    target: { id: unit.row.id, label: unit.row.title },
-    summary: `Mark “${unit.row.title}” complete in ${course.row.name}`,
+  const lesson = resolveLessonNamed(data, course.row.id, args.lesson || args.target)
+  if (!lesson.ok) return lesson
+  return ok('complete_lesson', 'local', {
+    target: { id: lesson.row.id, label: lesson.row.title },
+    summary: `Mark “${lesson.row.title}” complete in ${course.row.name}`,
     details: [
       { label: 'Course', value: course.row.name },
-      { label: 'Unit', value: unit.row.title },
+      { label: 'Lesson', value: lesson.row.title },
     ],
   })
 }
 
-function buildDeleteCourseUnit(args, data) {
+function buildDeleteLesson(args, data) {
   const course = resolveCourseNamed(data, args.course || args.target)
   if (!course.ok) return course
-  const unit = resolveUnitNamed(data, course.row.id, args.unit || args.target)
-  if (!unit.ok) return unit
-  return ok('delete_course_unit', 'local', {
-    target: { id: unit.row.id, label: unit.row.title },
-    summary: `Delete the unit “${unit.row.title}” from ${course.row.name}`,
+  const lesson = resolveLessonNamed(data, course.row.id, args.lesson || args.target)
+  if (!lesson.ok) return lesson
+  return ok('delete_lesson', 'local', {
+    target: { id: lesson.row.id, label: lesson.row.title },
+    summary: `Delete the lesson “${lesson.row.title}” from ${course.row.name}`,
     details: [
       { label: 'Course', value: course.row.name },
-      { label: 'Unit', value: unit.row.title },
+      { label: 'Lesson', value: lesson.row.title },
     ],
     destructive: true,
   })
@@ -528,8 +574,90 @@ function buildCreateProject(args) {
   })
 }
 
+function buildAdjustAccount(args, data) {
+  const found = resolveTarget(accountsFor(data), args.account || args.target, (row) => row.name)
+  if (!found.ok) return found
+  const account = found.row
+  const amount = parsePositive(args.amount)
+  if (!amount) return fail('Enter an amount greater than zero.')
+  const operation = ['add', 'subtract', 'set'].includes(args.operation) ? args.operation : 'add'
+  const current = accountBalance(account, data.transactions)
+  const next = operation === 'set' ? amount : operation === 'add' ? current + amount : current - amount
+  const verb = operation === 'set' ? 'Set' : operation === 'add' ? 'Add' : 'Take out'
+  return ok('adjust_account', 'local', {
+    target: { id: account.id, label: account.name },
+    payload: { mode: operation, amount },
+    summary:
+      operation === 'set'
+        ? `Set ${account.name} to ${money(amount)}`
+        : `${verb} ${money(amount)} ${operation === 'add' ? 'to' : 'from'} ${account.name}`,
+    details: [
+      { label: 'Account', value: account.name },
+      {
+        label: 'Change',
+        value: `${operation === 'add' ? '+' : operation === 'subtract' ? '−' : '='}${money(amount)}`,
+      },
+      { label: 'New balance', value: money(next) },
+    ],
+  })
+}
+
+function buildAddDebt(args) {
+  const direction = args.direction === 'i_owe' ? 'i_owe' : 'owed_to_me'
+  const checked = validateDebt({
+    counterparty: args.counterparty || args.target,
+    amount: args.amount,
+    direction,
+    due_date: args.due,
+    note: args.note,
+  })
+  if (!checked.ok) return fail(checked.error)
+  const payload = checked.payload
+  return ok('add_debt', 'local', {
+    payload,
+    summary:
+      payload.direction === 'i_owe'
+        ? `You owe ${payload.counterparty} ${money(payload.amount)}`
+        : `${payload.counterparty} owes you ${money(payload.amount)}`,
+    details: [
+      { label: 'With', value: payload.counterparty },
+      { label: 'Direction', value: payload.direction === 'i_owe' ? 'I owe' : 'Owes me' },
+      { label: 'Amount', value: money(payload.amount) },
+      ...(payload.due_date ? [{ label: 'Due', value: formatDateShort(payload.due_date) }] : []),
+      ...(payload.note ? [{ label: 'Note', value: payload.note }] : []),
+    ],
+  })
+}
+
+function buildSettleDebt(args, data) {
+  const found = resolveTarget(openDebts(data.debts), args.counterparty || args.target, (row) => row.counterparty)
+  if (!found.ok) return found
+  const debt = found.row
+  return ok('settle_debt', 'local', {
+    target: { id: debt.id, label: debt.counterparty },
+    summary: `Settle ${debt.direction === 'i_owe' ? 'what you owe' : 'what is owed to you by'} ${debt.counterparty} (${money(debt.amount)})`,
+    details: [
+      { label: 'With', value: debt.counterparty },
+      { label: 'Direction', value: debt.direction === 'i_owe' ? 'I owe' : 'Owes me' },
+      { label: 'Amount', value: money(debt.amount) },
+    ],
+  })
+}
+
+function buildDeleteDebt(args, data) {
+  const found = resolveTarget(data.debts || [], args.counterparty || args.target, (row) => row.counterparty)
+  if (!found.ok) return found
+  const debt = found.row
+  return ok('delete_debt', 'local', {
+    target: { id: debt.id, label: debt.counterparty },
+    summary: `Delete the ${debt.counterparty} debt (${money(debt.amount)})`,
+    details: [{ label: 'Debt', value: `${debt.counterparty} · ${money(debt.amount)}` }],
+    destructive: true,
+  })
+}
+
 const BUILDERS = {
-  create_transaction: (args) => buildCreateTransaction(args),
+  create_transaction: (args, data) => buildCreateTransaction(args, data),
   update_transaction: buildUpdateTransaction,
   delete_transaction: buildDeleteTransaction,
   create_budget: (args) => buildCreateBudget(args),
@@ -541,10 +669,14 @@ const BUILDERS = {
   update_note: buildUpdateNote,
   delete_note: buildDeleteNote,
   create_course: (args) => buildCreateCourse(args),
-  add_course_unit: buildAddCourseUnit,
-  complete_course_unit: buildCompleteCourseUnit,
-  delete_course_unit: buildDeleteCourseUnit,
+  add_lesson: buildAddLesson,
+  complete_lesson: buildCompleteLesson,
+  delete_lesson: buildDeleteLesson,
   create_project: (args) => buildCreateProject(args),
+  adjust_account: buildAdjustAccount,
+  add_debt: (args) => buildAddDebt(args),
+  settle_debt: buildSettleDebt,
+  delete_debt: buildDeleteDebt,
 }
 
 export function buildProposal(action, args, data) {
@@ -581,6 +713,15 @@ const UPDATE_BUDGET_RE = /^(?:change|update|set)\s+(?:the\s+)?budget\s+(?:for|on
 
 const PROJECT_RE = /^(?:add|create|start|new)\s+(?:a\s+)?project\s+(?:called\s+|titled\s+)?(.+)$/i
 const PROJECT_DUE_RE = /\s+due\s+(today|tomorrow|tonight|\d{4}-\d{2}-\d{2})\s*$/i
+
+const OWES_ME_RE = /^(.+?)\s+owes\s+me\s+(?:[$£€₱]\s*)?([\d.,]+)(?:\s+(?:by|on|due)\s+(today|tomorrow|\d{4}-\d{2}-\d{2}))?$/i
+const I_OWE_RE = /^i\s+owe\s+(.+?)\s+(?:[$£€₱]\s*)?([\d.,]+)(?:\s+(?:by|on|due)\s+(today|tomorrow|\d{4}-\d{2}-\d{2}))?$/i
+const SETTLE_DEBT_RE = /^(?:settle|clear)\s+(?:up\s+)?(?:the\s+)?(?:debt\s+(?:with|from|for)\s+)?(.+?)(?:\s+debt)?$/i
+const DELETE_DEBT_RE = /^(?:delete|remove|trash)\s+(?:the\s+)?debt\s+(?:with|from|for)\s+(.+)$/i
+
+const ADJUST_ADD_RE = /^(?:add|deposit|put|top up)\s+(?:[$£€₱]\s*)?([\d.,]+)\s+(?:to|into|in)\s+(?:my\s+)?(.+)$/i
+const ADJUST_SUB_RE = /^(?:subtract|deduct|withdraw|take out|remove)\s+(?:[$£€₱]\s*)?([\d.,]+)\s+(?:from|out of)\s+(?:my\s+)?(.+)$/i
+const ADJUST_SET_RE = /^set\s+(?:my\s+)?(.+?)\s+(?:balance\s+)?to\s+(?:[$£€₱]\s*)?([\d.,]+)$/i
 
 function splitTitleBody(rest) {
   const match = String(rest || '').match(/^(.+?)\s*:\s*(.+)$/)
@@ -630,6 +771,49 @@ export function parseLocalAction(text, data) {
     return buildProposal('update_note', { target: match[1], title: match[2] }, data)
   }
 
+  match = value.match(OWES_ME_RE)
+  if (match) {
+    return buildProposal(
+      'add_debt',
+      { counterparty: match[1], amount: amountFrom(match[2]), direction: 'owed_to_me', due: dateFrom(match[3]) },
+      data,
+    )
+  }
+
+  match = value.match(I_OWE_RE)
+  if (match) {
+    return buildProposal(
+      'add_debt',
+      { counterparty: match[1], amount: amountFrom(match[2]), direction: 'i_owe', due: dateFrom(match[3]) },
+      data,
+    )
+  }
+
+  match = value.match(DELETE_DEBT_RE)
+  if (match) return buildProposal('delete_debt', { counterparty: match[1] }, data)
+
+  match = value.match(SETTLE_DEBT_RE)
+  if (match) return buildProposal('settle_debt', { counterparty: match[1] }, data)
+
+  match = value.match(ADJUST_SET_RE)
+  if (match) {
+    return buildProposal('adjust_account', { account: match[1], amount: amountFrom(match[2]), operation: 'set' }, data)
+  }
+
+  match = value.match(ADJUST_ADD_RE)
+  if (match) {
+    return buildProposal('adjust_account', { account: match[2], amount: amountFrom(match[1]), operation: 'add' }, data)
+  }
+
+  match = value.match(ADJUST_SUB_RE)
+  if (match) {
+    return buildProposal(
+      'adjust_account',
+      { account: match[2], amount: amountFrom(match[1]), operation: 'subtract' },
+      data,
+    )
+  }
+
   match = value.match(PROJECT_RE)
   if (match) {
     let rest = match[1].trim()
@@ -657,18 +841,26 @@ export function parseLocalAction(text, data) {
   match = value.match(SPEND_RE) || value.match(ADD_TX_RE)
   if (match) {
     const income = /income/i.test(value)
+    const { text: merchant, account } = splitAccount(cleanMerchant(match[2]), data)
     return buildProposal(
       'create_transaction',
-      { amount: amountFrom(match[1]), merchant: cleanMerchant(match[2]) || 'Income', type: income ? 'income' : 'expense' },
+      {
+        amount: amountFrom(match[1]),
+        merchant: merchant || 'Income',
+        type: income ? 'income' : 'expense',
+        account: account?.name,
+        account_id: account?.id,
+      },
       data,
     )
   }
 
   match = value.match(INCOME_RE)
   if (match) {
+    const { text: merchant, account } = splitAccount(cleanMerchant(match[2]), data)
     return buildProposal(
       'create_transaction',
-      { amount: amountFrom(match[1]), merchant: cleanMerchant(match[2]) || 'Income', type: 'income' },
+      { amount: amountFrom(match[1]), merchant: merchant || 'Income', type: 'income', account: account?.name, account_id: account?.id },
       data,
     )
   }
@@ -687,13 +879,18 @@ export function buildExtractedProposal(extracted, data) {
 }
 
 /** Non-private context for the extract-action prompt. */
-export function buildActionContext() {
-  return [
+export function buildActionContext(data) {
+  const lines = [
     `Today: ${todayISO()}`,
     `Allowed categories: ${MONEY_CATEGORIES.join(', ')}`,
     `Note tags: ${NOTE_TAGS.join(', ')}`,
     `Plan tags: ${PLAN_TAGS.join(', ')}`,
-  ].join('\n')
+    'Debt directions: owed_to_me (they owe the user), i_owe (the user owes them)',
+    'Account operations: add, subtract, set',
+  ]
+  const accounts = accountsFor(data)
+  if (accounts.length) lines.push(`Accounts the user has: ${accounts.map((row) => row.name).join(', ')}`)
+  return lines.join('\n')
 }
 
 /* ------------------------------------------------------------------ */
@@ -727,14 +924,36 @@ export async function runAction(services, proposal) {
       return services.deleteNote(proposal.target.id)
     case 'create_course':
       return services.createCourse(proposal.payload)
-    case 'add_course_unit':
-      return services.createCourseUnit(proposal.payload)
-    case 'complete_course_unit':
-      return services.completeCourseUnit(proposal.target.id, true)
-    case 'delete_course_unit':
-      return services.deleteCourseUnit(proposal.target.id)
+    case 'add_lesson': {
+      let moduleId = proposal.target?.moduleId
+      if (!moduleId) {
+        const created = await services.createModule({
+          course_id: proposal.target.courseId,
+          title: 'Lessons',
+          description: '',
+          position: 0,
+        })
+        moduleId = created?.id
+      }
+      return services.createLesson({ module_id: moduleId, ...proposal.payload })
+    }
+    case 'complete_lesson':
+      return services.toggleLesson(proposal.target.id, true)
+    case 'delete_lesson':
+      return services.deleteLesson(proposal.target.id)
     case 'create_project':
       return services.createProject(proposal.payload)
+    case 'adjust_account': {
+      const { mode, amount } = proposal.payload
+      if (mode === 'set') return services.reconcileAccount(proposal.target.id, amount)
+      return services.adjustOpeningBalance(proposal.target.id, mode === 'subtract' ? -amount : amount)
+    }
+    case 'add_debt':
+      return services.createDebt(proposal.payload)
+    case 'settle_debt':
+      return services.settleDebt(proposal.target.id, true)
+    case 'delete_debt':
+      return services.deleteDebt(proposal.target.id)
     default:
       throw new Error('That action is not allowed.')
   }
@@ -753,8 +972,12 @@ export const ACTION_LABELS = {
   update_note: 'Update note',
   delete_note: 'Delete note',
   create_course: 'Add course',
-  add_course_unit: 'Add unit',
-  complete_course_unit: 'Complete unit',
-  delete_course_unit: 'Delete unit',
+  add_lesson: 'Add lesson',
+  complete_lesson: 'Complete lesson',
+  delete_lesson: 'Delete lesson',
   create_project: 'Add project',
+  adjust_account: 'Adjust balance',
+  add_debt: 'Log debt',
+  settle_debt: 'Settle debt',
+  delete_debt: 'Delete debt',
 }

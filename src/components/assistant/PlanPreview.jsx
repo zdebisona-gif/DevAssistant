@@ -4,7 +4,6 @@ import { formatDateShort } from '../../lib/analytics.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 function metaFor(item) {
-  if (item.kind === 'unit') return `Unit · ${item.course}`
   const date = formatDateShort(item.date)
   const time = item.time ? String(item.time).slice(0, 5) : null
   return [date, time, item.tag].filter(Boolean).join(' · ')

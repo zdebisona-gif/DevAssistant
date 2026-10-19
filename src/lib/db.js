@@ -10,19 +10,47 @@ async function selectAll(table, order) {
 
 /** Fetch every table the app reads. Rows are tiny, so one round-trip each is fine. */
 export async function loadAll() {
-  const [budgets, transactions, notes, courses, units, sessions, planner, projects, penalties] =
-    await Promise.all([
-      selectAll('budgets', { column: 'category' }),
-      selectAll('transactions', { column: 'occurred_on', ascending: false }),
-      selectAll('notes', { column: 'updated_at', ascending: false }),
-      selectAll('courses', { column: 'position' }),
-      selectAll('course_units', { column: 'position' }),
-      selectAll('study_sessions', { column: 'studied_on' }),
-      selectAll('planner_entries', { column: 'entry_date' }),
-      selectAll('projects', { column: 'due_date' }),
-      selectAll('project_penalties', { column: 'created_at', ascending: false }),
-    ])
-  return { budgets, transactions, notes, courses, units, sessions, planner, projects, penalties }
+  const [
+    budgets,
+    transactions,
+    notes,
+    courses,
+    modules,
+    lessons,
+    sessions,
+    planner,
+    projects,
+    penalties,
+    accounts,
+    debts,
+  ] = await Promise.all([
+    selectAll('budgets', { column: 'category' }),
+    selectAll('transactions', { column: 'occurred_on', ascending: false }),
+    selectAll('notes', { column: 'updated_at', ascending: false }),
+    selectAll('courses', { column: 'position' }),
+    selectAll('course_modules', { column: 'position' }),
+    selectAll('lessons', { column: 'position' }),
+    selectAll('study_sessions', { column: 'studied_on' }),
+    selectAll('planner_entries', { column: 'entry_date' }),
+    selectAll('projects', { column: 'due_date' }),
+    selectAll('project_penalties', { column: 'created_at', ascending: false }),
+    selectAll('accounts', { column: 'position' }),
+    selectAll('debts', { column: 'created_at', ascending: false }),
+  ])
+  return {
+    budgets,
+    transactions,
+    notes,
+    courses,
+    modules,
+    lessons,
+    sessions,
+    planner,
+    projects,
+    penalties,
+    accounts,
+    debts,
+  }
 }
 
 async function insert(table, row) {
@@ -58,9 +86,13 @@ export const addCourse = (row) => insert('courses', row)
 export const updateCourse = (id, patch) => update('courses', id, patch)
 export const deleteCourse = (id) => remove('courses', id)
 
-export const addCourseUnit = (row) => insert('course_units', row)
-export const updateCourseUnit = (id, patch) => update('course_units', id, patch)
-export const deleteCourseUnit = (id) => remove('course_units', id)
+export const addModule = (row) => insert('course_modules', row)
+export const updateModule = (id, patch) => update('course_modules', id, patch)
+export const deleteModule = (id) => remove('course_modules', id)
+
+export const addLesson = (row) => insert('lessons', row)
+export const updateLesson = (id, patch) => update('lessons', id, patch)
+export const deleteLesson = (id) => remove('lessons', id)
 
 export const addSession = (row) => insert('study_sessions', row)
 export const updateSession = (id, patch) => update('study_sessions', id, patch)
@@ -77,3 +109,11 @@ export const deleteProject = (id) => remove('projects', id)
 export const addPenalty = (row) => insert('project_penalties', row)
 export const updatePenalty = (id, patch) => update('project_penalties', id, patch)
 export const deletePenalty = (id) => remove('project_penalties', id)
+
+export const addAccount = (row) => insert('accounts', row)
+export const updateAccount = (id, patch) => update('accounts', id, patch)
+export const deleteAccount = (id) => remove('accounts', id)
+
+export const addDebt = (row) => insert('debts', row)
+export const updateDebt = (id, patch) => update('debts', id, patch)
+export const deleteDebt = (id) => remove('debts', id)

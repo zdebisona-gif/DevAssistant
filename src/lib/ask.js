@@ -18,6 +18,8 @@ import {
   weekHours,
 } from './analytics.js'
 import { money } from './format.js'
+import { accountRows, debtTotals, openDebts } from './accounts.js'
+import { coursesTree } from './learning.js'
 import { creditBalance, dueMeta, openPenalties, sortProjects } from './projects.js'
 
 const CATEGORY_KEYWORDS = [
@@ -120,8 +122,9 @@ function emptyResult(question) {
   }
 }
 
-export function answerQuery(question, data) {
+export function answerQuery(question, data, options = {}) {
   const q = String(question || '')
+  const hidden = Boolean(options.hidden)
   const {
     transactions = [],
     budgets = [],
@@ -131,6 +134,8 @@ export function answerQuery(question, data) {
     courses = [],
     projects = [],
     penalties = [],
+    accounts = [],
+    debts = [],
   } = data || {}
   const hasAnything =
     transactions.length +
@@ -140,11 +145,102 @@ export function answerQuery(question, data) {
       planner.length +
       courses.length +
       projects.length +
-      penalties.length >
+      penalties.length +
+      accounts.length +
+      debts.length >
     0
   if (!hasAnything) return emptyResult(q)
 
   const stamp = { queriedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+
+  // Debts — who owes whom.
+  if (/owe|owes|owed|debt|debts|lent|borrow|iou/i.test(q)) {
+    const open = openDebts(debts)
+    if (!open.length) {
+      return {
+        answer: 'No open debts are tracked. Tell me something like “Juan owes me 500” and I can log it.',
+        breakdown: [],
+        insight: 'Debts you add in Money show up here and in your answers.',
+        followUps: ['What is in my accounts?', 'Where did my money go this month?'],
+        sources: ['Finances'],
+        ...stamp,
+      }
+    }
+    if (hidden) {
+      return {
+        answer: `You have ${open.length} open ${open.length === 1 ? 'debt' : 'debts'}, but amounts are hidden on this device.`,
+        breakdown: [],
+        insight: 'Turn off Hide balances in Settings to see the figures in answers.',
+        followUps: ['What is in my accounts?'],
+        sources: ['Finances'],
+        ...stamp,
+      }
+    }
+    const totals = debtTotals(debts)
+    const owedToMe = open.filter((debt) => debt.direction !== 'i_owe')
+    const iOwe = open.filter((debt) => debt.direction === 'i_owe')
+    const next = iOwe[0] || owedToMe[0]
+    return {
+      answer: `${money(totals.owedToMe, 0)} is owed to you and you owe ${money(totals.iOwe, 0)} across ${open.length} open ${open.length === 1 ? 'debt' : 'debts'}.`,
+      breakdown: [
+        ...owedToMe.slice(0, 4).map((debt) => ({
+          label: `Owes me · ${debt.counterparty}`,
+          value: round(Number(debt.amount) || 0),
+          limit: Math.max(totals.owedToMe, 1),
+        })),
+        ...iOwe.slice(0, 4).map((debt) => ({
+          label: `I owe · ${debt.counterparty}`,
+          value: round(Number(debt.amount) || 0),
+          limit: Math.max(totals.iOwe, 1),
+        })),
+      ],
+      insight: next
+        ? `${next.direction === 'i_owe' ? 'You owe' : 'Owed to you by'} ${next.counterparty} ${money(next.amount, 0)}${next.due_date ? `, due ${formatDateShort(next.due_date)}` : ''}.`
+        : 'Nothing outstanding.',
+      followUps: ['What is in my accounts?', 'Where did my money go this month?'],
+      sources: ['Finances'],
+      ...stamp,
+    }
+  }
+
+  // Accounts — manual balances.
+  if (!/\bnet\b/i.test(q) && /account|accounts|assets|gcash|bdo|\bcash\b|balance/i.test(q)) {
+    const rows = accountRows(data)
+    if (!rows.length) {
+      return {
+        answer: 'You have not added any accounts yet. Add one in Money and tag spending to it.',
+        breakdown: [],
+        insight: 'Account balances are your opening balance plus whatever is tagged to them.',
+        followUps: ['Where did my money go this month?'],
+        sources: ['Finances'],
+        ...stamp,
+      }
+    }
+    if (hidden) {
+      return {
+        answer: `You track ${rows.length} ${rows.length === 1 ? 'account' : 'accounts'}, but their balances are hidden on this device.`,
+        breakdown: [],
+        insight: 'Turn off Hide balances in Settings to see the figures in answers.',
+        followUps: ['Who owes me money?'],
+        sources: ['Finances'],
+        ...stamp,
+      }
+    }
+    const total = rows.reduce((sum, row) => sum + row.balance, 0)
+    const top = [...rows].sort((a, b) => b.balance - a.balance)[0]
+    return {
+      answer: `Your accounts hold ${money(total, 0)} across ${rows.length} ${rows.length === 1 ? 'account' : 'accounts'}.`,
+      breakdown: rows.slice(0, 5).map((row) => ({
+        label: row.name,
+        value: round(row.balance),
+        limit: Math.max(...rows.map((entry) => Math.abs(entry.balance)), 1),
+      })),
+      insight: `${top.name} is the largest at ${money(top.balance, 0)}, with ${money(top.income, 0)} in this month.`,
+      followUps: ['Who owes me money?', 'Where did my money go this month?'],
+      sources: ['Finances'],
+      ...stamp,
+    }
+  }
 
   // Projects — deadlines, credits and the lock. Checked before Plan, which also matches "week".
   if (/project|deliverable|deadline|overdue|\bdue\b|penalt|atonement|atone|credits|locked/i.test(q)) {
@@ -387,15 +483,16 @@ export function answerQuery(question, data) {
   if (/learn|study|streak|course|hours?|progress/i.test(q)) {
     const hours = weekHours(sessions)
     const streak = currentStreak(sessions)
+    const trees = coursesTree(data)
     return {
       answer: `You have studied ${hours}h this week and your current streak is ${streak} ${streak === 1 ? 'day' : 'days'}.`,
-      breakdown: courses.slice(0, 4).map((course) => ({
-        label: course.name,
-        value: course.completed_units || 0,
-        limit: Math.max(course.total_units || 1, 1),
+      breakdown: trees.slice(0, 4).map((tree) => ({
+        label: tree.name,
+        value: tree.done,
+        limit: Math.max(tree.total, 1),
       })),
-      insight: courses.length
-        ? `${courses.length} course${courses.length === 1 ? '' : 's'} in progress.`
+      insight: trees.length
+        ? `${trees.length} course${trees.length === 1 ? '' : 's'} in progress.`
         : 'No courses tracked yet.',
       followUps: ['How many hours did I study this week?', 'What is on my plan today?'],
       sources: ['Learning'],
@@ -458,7 +555,8 @@ export function answerQuery(question, data) {
 
 /** Suggestion chips derived from what the user actually has. */
 export function deriveSuggestions(data, count = 4) {
-  const { transactions = [], notes = [], planner = [], sessions = [], projects = [] } = data || {}
+  const { transactions = [], notes = [], planner = [], sessions = [], projects = [], accounts = [], debts = [] } =
+    data || {}
   const out = []
   const now = new Date()
   const spentThisMonth = transactions.some((tx) => {
@@ -469,6 +567,8 @@ export function deriveSuggestions(data, count = 4) {
     out.push('Where did my money go this month?')
     out.push('Which category grew the fastest?')
   }
+  if (accounts.length) out.push('What is in my accounts?')
+  if (debts.length) out.push('Who owes me money?')
   if (planner.length) out.push("What's on my plan today?")
   if (sessions.length) out.push('How many hours did I study this week?')
   if (notes.length) out.push('Summarize my recent notes')

@@ -5,6 +5,14 @@ export function money(value, decimals = 2) {
   })}`
 }
 
+/* A fixed-width mask so hidden balances never shift the layout around them. */
+export const HIDDEN_MONEY = '₱••••••'
+
+/** Money, or the mask when the user has balances hidden. */
+export function moneyOr(value, hidden, decimals = 2) {
+  return hidden ? HIDDEN_MONEY : money(value, decimals)
+}
+
 export function num(value) {
   return value.toLocaleString()
 }

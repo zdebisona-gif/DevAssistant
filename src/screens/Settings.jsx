@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
 import { CaretRight, Database, Info, LockKey, SignOut, Sparkle } from '../icons.js'
 import { Alert, Pressable, Switch, Text, View } from 'react-native'
+import ChangePasswordForm from '../components/forms/ChangePasswordForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import { Card, CardBody, CardHeader } from '../components/ui/Card.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
 import { useData } from '../data/store.jsx'
 import { useAuth } from '../data/auth.jsx'
 import { remainingToday, useAiPrefs } from '../data/aiPrefs.jsx'
+import { usePrivacy } from '../data/privacy.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
@@ -66,7 +69,10 @@ export default function Settings() {
   const { user, signOut } = useAuth()
   const { reset } = useOnboarding()
   const { enabled: aiEnabled, setEnabled: setAiEnabled, usage } = useAiPrefs()
+  const { hidden, setHidden } = usePrivacy()
   const router = useRouter()
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [passwordChanged, setPasswordChanged] = useState(false)
 
   const remaining = remainingToday(usage)
   const cap = usage?.cap ?? 50
@@ -79,6 +85,12 @@ export default function Settings() {
     Haptics.selectionAsync().catch(() => {})
     await reset()
     router.replace('/welcome')
+  }
+
+  const openPassword = () => {
+    Haptics.selectionAsync().catch(() => {})
+    setPasswordChanged(false)
+    setPasswordOpen(true)
   }
 
   const confirmSignOut = () => {
@@ -112,7 +124,16 @@ export default function Settings() {
             Every note, transaction, plan and project belongs to this account. Signing out hides
             them from this device.
           </Text>
+          {passwordChanged ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.success }}
+            >
+              Password updated. Use it next time you sign in.
+            </Text>
+          ) : null}
         </CardBody>
+        <Row label="Change password" onPress={openPassword} />
         <Row
           label="Sign out"
           onPress={confirmSignOut}
@@ -128,6 +149,42 @@ export default function Settings() {
           onPress={undefined}
           right={<ThemeToggle />}
         />
+      </Card>
+
+      <Card>
+        <CardHeader title="Privacy" subtitle="Balances on screen" />
+        <Row
+          label="Hide balances"
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {})
+            setHidden(!hidden)
+          }}
+          right={
+            <Switch
+              value={hidden}
+              onValueChange={(next) => {
+                Haptics.selectionAsync().catch(() => {})
+                setHidden(next)
+              }}
+              trackColor={{ false: c.border, true: c.primary }}
+              thumbColor={c.card}
+            />
+          }
+        />
+        <CardBody style={{ gap: 8 }}>
+          <Text
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+          >
+            Masks account balances, the total in your accounts and debt amounts as ₱••••••. Spending,
+            budgets and transaction amounts stay visible.
+          </Text>
+          <Text
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+          >
+            While it is on, hidden balances are also left out of the context Zen-I sends to Gemini.
+            This setting is per device.
+          </Text>
+        </CardBody>
       </Card>
 
       <Card>
@@ -200,6 +257,8 @@ export default function Settings() {
           <View style={{ gap: 8 }}>
             <CountRow label="Notes" count={data.notes.length} />
             <CountRow label="Transactions" count={data.transactions.length} />
+            <CountRow label="Accounts" count={data.accounts.length} />
+            <CountRow label="Debts" count={data.debts.length} />
             <CountRow label="Budgets" count={data.budgets.length} />
             <CountRow label="Plan entries" count={data.planner.length} />
             <CountRow label="Courses" count={data.courses.length} />
@@ -233,6 +292,14 @@ export default function Settings() {
           </Text>
         </CardBody>
       </Card>
+
+      <ChangePasswordForm
+        visible={passwordOpen}
+        onClose={(changed) => {
+          setPasswordOpen(false)
+          if (changed === true) setPasswordChanged(true)
+        }}
+      />
     </Screen>
   )
 }

@@ -151,18 +151,6 @@ export function currentStreak(sessions, ref = new Date()) {
   return streak
 }
 
-export function courseRow(course) {
-  const total = Number(course.total_units) || 0
-  const done = Number(course.completed_units) || 0
-  return {
-    id: course.id,
-    name: course.name,
-    progress: total > 0 ? Math.round((done / total) * 100) : 0,
-    detail: `${done} of ${total} units`,
-    next: course.next_label,
-  }
-}
-
 const round1 = (n) => Math.round(n * 10) / 10
 
 /** Hours logged for a course during the week containing `ref`. */
