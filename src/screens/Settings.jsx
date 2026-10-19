@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { CaretRight, Database, Info } from '../icons.js'
-import { Pressable, Text, View } from 'react-native'
+import { CaretRight, Database, Info, Sparkle } from '../icons.js'
+import { Pressable, Switch, Text, View } from 'react-native'
 import Screen from '../components/layout/Screen.jsx'
 import { Card, CardBody, CardHeader } from '../components/ui/Card.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
 import { useData } from '../data/store.jsx'
+import { remainingToday, useAiPrefs } from '../data/aiPrefs.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
@@ -62,7 +63,15 @@ export default function Settings() {
   const { c, fonts, text } = useTheme()
   const { data, reload } = useData()
   const { reset } = useOnboarding()
+  const { enabled: aiEnabled, setEnabled: setAiEnabled, usage } = useAiPrefs()
   const router = useRouter()
+
+  const remaining = remainingToday(usage)
+  const cap = usage?.cap ?? 50
+  const usageLabel =
+    remaining === null
+      ? 'No AI requests yet today'
+      : `AI usage: ${Math.max(0, cap - remaining)}/${cap} today`
 
   const replay = async () => {
     Haptics.selectionAsync().catch(() => {})
@@ -80,6 +89,49 @@ export default function Settings() {
           onPress={undefined}
           right={<ThemeToggle />}
         />
+      </Card>
+
+      <Card>
+        <CardHeader title="AI features" subtitle="Optional · off by default" />
+        <Row
+          label="Gemini answers"
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {})
+            setAiEnabled(!aiEnabled)
+          }}
+          right={
+            <Switch
+              value={aiEnabled}
+              onValueChange={(next) => {
+                Haptics.selectionAsync().catch(() => {})
+                setAiEnabled(next)
+              }}
+              trackColor={{ false: c.border, true: c.primary }}
+              thumbColor={c.card}
+            />
+          }
+        />
+        <CardBody style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Sparkle size={14} weight="bold" color={c.mutedForeground} />
+            <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+              {usageLabel}
+            </Text>
+          </View>
+          <Text
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+          >
+            When on, Zen-I can send the numbers it needs — totals, budgets, study hours, plan
+            entries — to Gemini to explain or advise. It stays off until you ask for it, and the
+            on-device answer always works without it.
+          </Text>
+          <Text
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+          >
+            Never sent: note bodies (unless you tap Summarize on one), individual transactions,
+            passwords, keys or account numbers. Free tier only, capped at {cap} requests a day.
+          </Text>
+        </CardBody>
       </Card>
 
       <Card>

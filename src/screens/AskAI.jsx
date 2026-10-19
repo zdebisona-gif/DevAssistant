@@ -18,13 +18,22 @@ import Button from '../components/ui/Button.jsx'
 import Chip from '../components/ui/Chip.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
 import { useData } from '../data/store.jsx'
+import { useAiPrefs } from '../data/aiPrefs.jsx'
 import { answerQuery, deriveSuggestions } from '../lib/ask.js'
 import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
+import { buildContextFor } from '../lib/context.js'
+import { askGemini, describeGeminiError, inCooldown } from '../lib/gemini.js'
+import { classifyIntent } from '../lib/intent.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
+
+function fallbackNote(error) {
+  return `${describeGeminiError(error)} Showing the on-device answer.`
+}
 
 function AssistantMessage({ message, onFollowUp }) {
   const { c, fonts, radius, text } = useTheme()
-  const { answer, breakdown, insight, followUps } = message
+  const { answer, breakdown, insight, followUps, label } = message
+  const isAi = Boolean(label?.startsWith('AI'))
   return (
     <View style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -32,6 +41,28 @@ function AssistantMessage({ message, onFollowUp }) {
         <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.caption, color: c.foreground }}>
           Zen-I
         </Text>
+        {label ? (
+          <View
+            style={{
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: isAi ? c.accent : c.border,
+              borderRadius: radius.sm,
+              paddingHorizontal: 6,
+              paddingVertical: 1,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: fonts.mono,
+                fontSize: text.micro,
+                letterSpacing: 0.4,
+                color: isAi ? c.accent : c.mutedForeground,
+              }}
+            >
+              {label}
+            </Text>
+          </View>
+        ) : null}
       </View>
       <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 21, color: c.body }}>
         {answer}
@@ -78,6 +109,19 @@ function AssistantMessage({ message, onFollowUp }) {
       {message.sources?.length ? (
         <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
           Sources · {message.sources.join(' · ')} · {message.queriedAt}
+        </Text>
+      ) : null}
+
+      {message.note ? (
+        <Text
+          style={{
+            fontFamily: fonts.sans,
+            fontSize: text.micro,
+            lineHeight: 16,
+            color: c.mutedForeground,
+          }}
+        >
+          {message.note}
         </Text>
       ) : null}
     </View>
@@ -146,6 +190,7 @@ export default function AskAI() {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
   const { data } = useData()
+  const { enabled: aiEnabled, recordUsage } = useAiPrefs()
   const { q } = useLocalSearchParams()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -160,20 +205,44 @@ export default function AskAI() {
     loadAskHistory().then(setHistory)
   }, [])
 
-  const ask = (question) => {
-    const value = question.trim()
+  const ask = async (question) => {
+    const value = String(question || '').trim()
     if (!value || pending) return
-    setMessages((prev) => [...prev, { id: `u${prev.length}`, role: 'user', text: value }])
+    const stamp = Date.now()
+    setMessages((prev) => [...prev, { id: `u${stamp}`, role: 'user', text: value }])
     setInput('')
     setPending(true)
     pushAskHistory(value, history).then(setHistory)
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { id: `a${prev.length}`, role: 'assistant', ...answerQuery(value, data) },
-      ])
-      setPending(false)
-    }, 400)
+
+    const local = answerQuery(value, data)
+    const intent = classifyIntent(value)
+    const reply = { ...local, label: 'Local answer' }
+
+    if (intent.kind === 'ai' && aiEnabled && !inCooldown()) {
+      try {
+        const { context, sources } = buildContextFor(intent.domain, data)
+        const { text: aiText, model, remaining, cap } = await askGemini({
+          task: 'advise',
+          question: value,
+          context,
+        })
+        recordUsage({ remaining, cap, model })
+        reply.answer = aiText
+        reply.label = 'AI · Gemini'
+        reply.sources = [...new Set([...(local.sources || []), ...sources])]
+      } catch (error) {
+        reply.note = fallbackNote(error)
+      }
+    } else if (intent.kind === 'ai') {
+      reply.note = aiEnabled
+        ? 'Gemini is cooling down after its free limit, so here is the on-device answer.'
+        : 'AI is off, so this is the on-device answer. Turn it on in Settings for advice.'
+    } else if (intent.kind === 'clarify') {
+      reply.note = 'Name an area — spending, study or your plan — and I can go deeper.'
+    }
+
+    setMessages((prev) => [...prev, { id: `a${stamp}`, role: 'assistant', ...reply }])
+    setPending(false)
   }
 
   useEffect(() => {

@@ -1,0 +1,113 @@
+/*
+ * Client for the Gemini Edge Function proxy. The API key never touches the app.
+ * All failures resolve to a typed GeminiUnavailable so callers can silently fall back
+ * to the local engine. A 429 puts the proxy in a short cooldown to avoid hammering it.
+ */
+
+import { supabase } from './supabase.js'
+
+const TIMEOUT_MS = 15000
+const COOLDOWN_MS = 10 * 60 * 1000
+
+let cooldownUntil = 0
+
+export class GeminiUnavailable extends Error {
+  constructor(kind, detail) {
+    super(kind)
+    this.name = 'GeminiUnavailable'
+    this.kind = kind
+    this.detail = detail
+  }
+}
+
+export function inCooldown() {
+  return Date.now() < cooldownUntil
+}
+
+/** Short, human reason for why Gemini was skipped or failed. */
+export function describeGeminiError(error) {
+  switch (error?.kind) {
+    case 'not-configured':
+      return 'Gemini is not connected yet.'
+    case 'rate-limit':
+    case 'daily-cap':
+      return 'Gemini has hit its free limit for now.'
+    case 'cooldown':
+      return 'Gemini is cooling down after its free limit.'
+    case 'timeout':
+    case 'network':
+      return 'Could not reach Gemini just now.'
+    case 'empty':
+      return 'Gemini returned nothing.'
+    default:
+      return 'Gemini was unavailable.'
+  }
+}
+
+export function cooldownRemainingMs() {
+  return Math.max(0, cooldownUntil - Date.now())
+}
+
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new GeminiUnavailable('timeout')), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
+/**
+ * @returns {Promise<{ text: string, model: string, remaining?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function askGemini({ task = 'explain', question, context = '' }) {
+  const q = String(question || '').trim()
+  if (!q) throw new GeminiUnavailable('bad-request')
+  if (inCooldown()) throw new GeminiUnavailable('cooldown')
+
+  let result
+  try {
+    result = await withTimeout(
+      supabase.functions.invoke('gemini', {
+        body: { task, question: q.slice(0, 500), context: String(context || '').slice(0, 4000) },
+      }),
+      TIMEOUT_MS,
+    )
+  } catch (error) {
+    if (error instanceof GeminiUnavailable) throw error
+    throw new GeminiUnavailable('network')
+  }
+
+  const { data, error } = result || {}
+  if (error) {
+    const status = Number(error?.context?.status ?? error?.status) || 0
+    if (status === 429) {
+      cooldownUntil = Date.now() + COOLDOWN_MS
+      throw new GeminiUnavailable('rate-limit')
+    }
+    if (status === 503) throw new GeminiUnavailable('not-configured')
+    throw new GeminiUnavailable('proxy', status || undefined)
+  }
+
+  if (data?.error) {
+    if (data.error === 'rate-limit' || data.error === 'daily-cap') {
+      cooldownUntil = Date.now() + COOLDOWN_MS
+      throw new GeminiUnavailable(data.error)
+    }
+    if (data.error === 'not-configured') throw new GeminiUnavailable('not-configured')
+    throw new GeminiUnavailable('proxy', data.error)
+  }
+
+  const text = String(data?.text || '').trim()
+  if (!text) throw new GeminiUnavailable('empty')
+
+  return { text, model: data?.model || 'gemini', remaining: data?.remaining, cap: data?.cap }
+}

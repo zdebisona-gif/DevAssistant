@@ -50,7 +50,20 @@ not truthfully copy this cross-record grounding.
   permissive RLS policies on the `anon` role; auth (Phase 3) replaces them before shipping.
 - Ask Zen-I is grounded: answers are computed from the user's records in `src/lib/ask.js` and
   return a written answer, a breakdown, an insight, follow-ups and a Sources line naming which
-  records were read. No model is called.
+  records were read. This on-device engine is the default answer path.
+- AI is an optional, off-by-default layer on top of the grounded engine. When Zane turns it on, an
+  intent router (`src/lib/intent.js`) decides which questions the deterministic engine answers
+  locally and which are explanations or advice that go to Gemini. Only the minimum context the
+  question needs is sent — one domain's aggregates built on demand in `src/lib/context.js` (finance
+  totals, study hours, plan entries) — never note bodies, individual transactions, passwords, keys
+  or account numbers. Answers are labelled "Local answer" or "AI · Gemini", and any failure falls
+  back to the local answer.
+- Gemini runs behind a Supabase Edge Function proxy (`supabase/functions/gemini/`): the API key is
+  a server-side secret, restricted to free-tier models, with a server-side daily request cap tracked
+  in `public.ai_usage` and bounded input/output. There is no API key in the app and no billing
+  account, so usage cannot incur charges. Settings shows the remaining requests for the day.
+- A note can be summarized with Gemini only when Zane explicitly taps "Summarize with Gemini" in
+  the note viewer; the chatbot never sends note bodies on its own.
 - Learning is connected, not isolated: a focus timer records real sessions (persisted across
   restarts), sessions link to a course and capture a takeaway, today's Study-tagged planner blocks
   are startable from Learning, courses carry a weekly hour target, and saving a takeaway also
@@ -73,7 +86,9 @@ not truthfully copy this cross-record grounding.
   store in `src/data/store.jsx`; the persisted focus timer in `src/data/focus.jsx`; all figures
   derived in `src/lib/analytics.js`.
 - Grounded Ask engine in `src/lib/ask.js` (pure functions) with recent-ask history in
-  `src/lib/askHistory.js`; every screen reads live rows.
+  `src/lib/askHistory.js`; per-domain context builders in `src/lib/context.js`; Gemini routing and
+  the proxy client in `src/lib/intent.js` and `src/lib/gemini.js`; the on/off preference and usage
+  reading in `src/data/aiPrefs.jsx`; every screen reads live rows.
 - Absences future work must not fabricate: no real user testimonials, no customers, no
   benchmarks, and no pricing.
 

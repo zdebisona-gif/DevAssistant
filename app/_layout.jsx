@@ -12,6 +12,7 @@ import { useEffect } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { DataProvider } from '../src/data/store.jsx'
 import { FocusProvider } from '../src/data/focus.jsx'
+import { AiPrefsProvider } from '../src/data/aiPrefs.jsx'
 import { OnboardingProvider, useOnboarding } from '../src/lib/onboarding.js'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider.jsx'
 
@@ -67,9 +68,11 @@ export default function RootLayout() {
       <ThemeProvider>
         <DataProvider>
           <FocusProvider>
-            <OnboardingProvider>
-              {fontsLoaded ? <RootStack /> : null}
-            </OnboardingProvider>
+            <AiPrefsProvider>
+              <OnboardingProvider>
+                {fontsLoaded ? <RootStack /> : null}
+              </OnboardingProvider>
+            </AiPrefsProvider>
           </FocusProvider>
         </DataProvider>
       </ThemeProvider>
