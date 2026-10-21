@@ -14,7 +14,7 @@ export default function ActionSheet({ visible, onClose, title, subtitle, actions
       <View style={{ gap: 6 }}>
         {actions.map((action) => {
           const Icon = action.icon
-          const tint = action.destructive ? c.destructive : c.foreground
+          const tint = action.destructive ? c.destructiveText : c.foreground
           return (
             <Pressable
               key={action.key ?? action.label}

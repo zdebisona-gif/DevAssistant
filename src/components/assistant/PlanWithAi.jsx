@@ -38,6 +38,7 @@ export default function PlanWithAi({ visible, defaultScope = 'general', onClose 
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setScope(hasCourses ? defaultScope : 'general')
     setHorizon('week')
     setGoal('')

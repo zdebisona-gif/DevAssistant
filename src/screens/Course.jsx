@@ -14,7 +14,7 @@ import CourseForm from '../components/forms/CourseForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
-import { confirmDelete } from '../lib/alerts.js'
+import { confirmDelete, reportError } from '../lib/alerts.js'
 import { courseTree } from '../lib/learning.js'
 import { useRowActions } from '../lib/rowActions.jsx'
 import { useTheme } from '../theme/ThemeProvider.jsx'
@@ -120,7 +120,7 @@ export default function Course() {
           onPress: () =>
             confirmDelete(course.name, () => {
               router.back()
-              deleteCourse(course.id).catch(() => {})
+              deleteCourse(course.id).catch(reportError)
             }),
         },
       ],
@@ -156,7 +156,7 @@ export default function Course() {
           icon: Trash,
           destructive: true,
           onPress: () =>
-            confirmDelete(module.title, () => deleteModule(module.id).catch(() => {})),
+            confirmDelete(module.title, () => deleteModule(module.id).catch(reportError)),
         },
       ],
     })
@@ -170,7 +170,7 @@ export default function Course() {
           key: 'toggle',
           label: lesson.done ? 'Mark incomplete' : 'Mark complete',
           icon: lesson.done ? Play : Check,
-          onPress: () => toggleLesson(lesson.id, !lesson.done).catch(() => {}),
+          onPress: () => toggleLesson(lesson.id, !lesson.done).catch(reportError),
         },
         {
           key: 'edit',
@@ -187,7 +187,7 @@ export default function Course() {
           label: 'Delete lesson',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(lesson.title, () => deleteLesson(lesson.id).catch(() => {})),
+          onPress: () => confirmDelete(lesson.title, () => deleteLesson(lesson.id).catch(reportError)),
         },
       ],
     })

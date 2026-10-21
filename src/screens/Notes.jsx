@@ -1,10 +1,11 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useMemo, useState } from 'react'
-import { Eye, PencilSimple, Plus, Trash } from '../icons.js'
+import { Eye, PencilSimple, Plus, Sparkle, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
+import GenerateNote from '../components/assistant/GenerateNote.jsx'
 import NoteForm from '../components/forms/NoteForm.jsx'
 import NoteView from '../components/views/NoteView.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
@@ -13,8 +14,9 @@ import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { NOTE_TAGS } from '../data/constants.js'
 import { useData } from '../data/store.jsx'
-import { confirmDelete } from '../lib/alerts.js'
+import { confirmDelete, reportError } from '../lib/alerts.js'
 import { relativeTime } from '../lib/analytics.js'
+import { NOTE_DRAFT_NOTICE } from '../lib/noteDraft.js'
 import { useRowActions } from '../lib/rowActions.jsx'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
@@ -24,6 +26,8 @@ export default function Notes() {
   const [filter, setFilter] = useState('All')
   const [formOpen, setFormOpen] = useState(false)
   const [record, setRecord] = useState(null)
+  const [defaults, setDefaults] = useState(null)
+  const [generateOpen, setGenerateOpen] = useState(false)
   const [viewing, setViewing] = useState(null)
   const { open, sheet } = useRowActions()
 
@@ -37,11 +41,20 @@ export default function Notes() {
 
   const openNew = () => {
     setRecord(null)
+    setDefaults(null)
     setFormOpen(true)
   }
 
   const openEdit = (note) => {
     setRecord(note)
+    setDefaults(null)
+    setFormOpen(true)
+  }
+
+  const openDraft = (draft) => {
+    setGenerateOpen(false)
+    setRecord(null)
+    setDefaults(draft)
     setFormOpen(true)
   }
 
@@ -57,15 +70,24 @@ export default function Notes() {
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(note.title, () => deleteNote(note.id).catch(() => {})),
+          onPress: () => confirmDelete(note.title, () => deleteNote(note.id).catch(reportError)),
         },
       ],
     })
 
   const header = (
-    <Button size="sm" variant="secondary" icon={Plus} onPress={openNew}>
-      New
-    </Button>
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <Button
+        size="icon"
+        variant="secondary"
+        icon={Sparkle}
+        accessibilityLabel="Generate note with AI"
+        onPress={() => setGenerateOpen(true)}
+      />
+      <Button size="sm" variant="secondary" icon={Plus} onPress={openNew}>
+        New
+      </Button>
+    </View>
   )
 
   return (
@@ -90,7 +112,7 @@ export default function Notes() {
                   accessibilityState={{ selected: active }}
                   onPress={() => setFilter(tag)}
                   style={{
-                    height: 36,
+                    height: 44,
                     justifyContent: 'center',
                     borderRadius: radius.pill,
                     paddingHorizontal: 14,
@@ -114,14 +136,7 @@ export default function Notes() {
           </ScrollView>
 
           {visible.length ? (
-            <Section
-              title={filter === 'All' ? 'All notes' : filter}
-              action={
-                <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                  {visible.length}
-                </Text>
-              }
-            >
+            <Section>
               <Card>
                 {visible.map((note, index) => (
                   <Pressable
@@ -201,7 +216,7 @@ export default function Notes() {
                   title={`No notes tagged "${filter}"`}
                   description="Try another tag, or clear the filter to see all notes."
                   action={
-                    <Pressable accessibilityRole="button" onPress={() => setFilter('All')} hitSlop={8}>
+                    <Pressable accessibilityRole="button" onPress={() => setFilter('All')} hitSlop={16}>
                       <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.caption, color: c.primaryFg }}>
                         Clear filter
                       </Text>
@@ -217,11 +232,21 @@ export default function Notes() {
       <NoteForm
         visible={formOpen}
         record={record}
+        defaults={defaults}
+        notice={defaults ? NOTE_DRAFT_NOTICE : null}
         onClose={() => {
           setFormOpen(false)
           setRecord(null)
+          setDefaults(null)
         }}
       />
+      {generateOpen ? (
+        <GenerateNote
+          visible
+          onClose={() => setGenerateOpen(false)}
+          onDraft={openDraft}
+        />
+      ) : null}
       <NoteView
         note={viewing}
         onClose={() => setViewing(null)}
@@ -235,7 +260,7 @@ export default function Notes() {
           const note = viewing
           confirmDelete(note.title, () => {
             setViewing(null)
-            deleteNote(note.id).catch(() => {})
+            deleteNote(note.id).catch(reportError)
           })
         }}
       />

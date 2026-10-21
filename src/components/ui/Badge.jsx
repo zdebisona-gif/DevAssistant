@@ -7,7 +7,7 @@ function tones(c) {
     primary: { bg: c.primarySoft, border: 'transparent', text: c.primaryFg },
     accent: { bg: c.accentSoft, border: 'transparent', text: c.accentText },
     success: { bg: c.successSoft, border: 'transparent', text: c.success },
-    danger: { bg: c.destructiveSoft, border: 'transparent', text: c.destructive },
+    danger: { bg: c.destructiveSoft, border: 'transparent', text: c.destructiveText },
     outline: { bg: 'transparent', border: c.border, text: c.mutedForeground },
   }
 }

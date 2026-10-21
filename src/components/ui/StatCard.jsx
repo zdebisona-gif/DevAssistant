@@ -44,7 +44,7 @@ export default function StatCard({ label, value, hint, delta, deltaIsGood = true
             style={{
               fontFamily: fonts.sansMedium,
               fontSize: text.caption,
-              color: deltaPositive ? c.success : c.destructive,
+              color: deltaPositive ? c.success : c.destructiveText,
               fontVariant: ['tabular-nums'],
             }}
           >

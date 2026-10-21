@@ -127,7 +127,7 @@ export default function SignIn() {
                   style={{
                     fontFamily: fonts.sansMedium,
                     fontSize: text.caption,
-                    color: c.destructive,
+                    color: c.destructiveText,
                   }}
                 >
                   {error}

@@ -17,7 +17,7 @@ import {
   totalsForPrevMonth,
   weekHours,
 } from './analytics.js'
-import { money } from './format.js'
+import { money, formatClock12 } from './format.js'
 import { accountRows, debtTotals, openDebts } from './accounts.js'
 import { coursesTree } from './learning.js'
 import { creditBalance, dueMeta, openPenalties, sortProjects } from './projects.js'
@@ -125,6 +125,7 @@ function emptyResult(question) {
 export function answerQuery(question, data, options = {}) {
   const q = String(question || '')
   const hidden = Boolean(options.hidden)
+  const accountsHidden = Boolean(options.accountsHidden)
   const {
     transactions = [],
     budgets = [],
@@ -216,11 +217,11 @@ export function answerQuery(question, data, options = {}) {
         ...stamp,
       }
     }
-    if (hidden) {
+    if (hidden || accountsHidden) {
       return {
         answer: `You track ${rows.length} ${rows.length === 1 ? 'account' : 'accounts'}, but their balances are hidden on this device.`,
         breakdown: [],
-        insight: 'Turn off Hide balances in Settings to see the figures in answers.',
+        insight: 'Turn off the balance hide in Settings to see the figures in answers.',
         followUps: ['Who owes me money?'],
         sources: ['Finances'],
         ...stamp,
@@ -301,7 +302,7 @@ export function answerQuery(question, data, options = {}) {
     const total = entries.length
     return {
       answer: `${when(dateISO)} you have ${total} ${total === 1 ? 'block' : 'blocks'}: ${entries
-        .map((e) => `${e.title}${e.start_time ? ` (${String(e.start_time).slice(0, 5)})` : ''}`)
+        .map((e) => `${e.title}${e.start_time ? ` (${formatClock12(e.start_time)})` : ''}`)
         .join(', ')}.`,
       breakdown: Array.from(counts.entries()).map(([label, value]) => ({ label, value, limit: total })),
       insight: `${entries.filter((e) => !e.done).length} of ${total} still open.`,

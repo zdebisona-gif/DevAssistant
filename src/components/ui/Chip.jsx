@@ -15,6 +15,8 @@ export default function Chip({ children, onPress, active = false }) {
         borderColor: active ? c.primary : c.border,
         backgroundColor: active ? c.primary : c.card,
         paddingHorizontal: 14,
+        minHeight: 44,
+        justifyContent: 'center',
         paddingVertical: 8,
         opacity: pressed ? 0.85 : 1,
       })}

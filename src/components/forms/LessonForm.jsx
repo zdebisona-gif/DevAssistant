@@ -18,6 +18,7 @@ export default function LessonForm({ visible, onClose, moduleId, record, positio
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(record?.title ?? '')
     setContent(record?.content ?? '')
     setError(null)

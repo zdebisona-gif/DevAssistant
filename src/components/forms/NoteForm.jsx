@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Text } from 'react-native'
+import { Text, View } from 'react-native'
 import Button from '../ui/Button.jsx'
 import Field from '../ui/Field.jsx'
 import Sheet from '../ui/Sheet.jsx'
@@ -9,7 +9,7 @@ import { useData } from '../../data/store.jsx'
 import { validateNote } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
-export default function NoteForm({ visible, onClose, record, defaults = null }) {
+export default function NoteForm({ visible, onClose, record, defaults = null, notice = null, onSaved = null }) {
   const { c, fonts, text } = useTheme()
   const { createNote, updateNote } = useData()
   const editing = Boolean(record)
@@ -22,6 +22,7 @@ export default function NoteForm({ visible, onClose, record, defaults = null }) 
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(record?.title ?? defaults?.title ?? '')
     setBody(record?.body ?? defaults?.body ?? '')
     setTag(record?.tag ?? defaults?.tag ?? NOTE_TAGS[0])
@@ -43,6 +44,7 @@ export default function NoteForm({ visible, onClose, record, defaults = null }) 
     try {
       if (editing) await updateNote(record.id, result.payload)
       else await createNote(result.payload)
+      onSaved?.(result.payload)
       onClose()
     } catch (cause) {
       setError(cause.message || 'Could not save the note.')
@@ -52,6 +54,13 @@ export default function NoteForm({ visible, onClose, record, defaults = null }) 
 
   return (
     <Sheet visible={visible} onClose={onClose} title={editing ? 'Edit note' : 'New note'}>
+      {notice ? (
+        <View style={{ borderLeftWidth: 2, borderLeftColor: c.accent, paddingLeft: 10 }}>
+          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.body }}>
+            {notice}
+          </Text>
+        </View>
+      ) : null}
       <Field label="Title" value={title} onChangeText={setTitle} placeholder="What's this about?" autoFocus={!editing} />
       <Field label="Body" value={body} onChangeText={setBody} placeholder="Write it down…" multiline />
       <TagPicker label="Tag" options={NOTE_TAGS} value={tag} onChange={setTag} />

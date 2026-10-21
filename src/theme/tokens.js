@@ -29,6 +29,7 @@ export const palettes = {
     success: '#15803d',
     successSoft: '#dcfce7',
     destructive: '#dc2626',
+    destructiveText: '#b91c1c',
     destructiveSoft: '#fee2e2',
     ring: '#1e40af',
     chart1: '#2563eb',
@@ -58,13 +59,14 @@ export const palettes = {
     success: '#4ade80',
     successSoft: '#12291d',
     destructive: '#ef4444',
+    destructiveText: '#fca5a5',
     destructiveSoft: '#331515',
     ring: '#60a5fa',
     chart1: '#60a5fa',
     chart2: '#fbbf24',
     chartGrid: '#24314a',
     scrim: 'rgba(0,0,0,0.6)',
-    overline: 'rgba(0,0,0,0.35)',
+    overline: 'rgba(255,255,255,0.08)',
   },
 }
 
@@ -111,6 +113,14 @@ export const motion = {
   fast: 140,
   base: 220,
   slow: 320,
+}
+
+/* Physical account-card gradients — the one place gradients are allowed. */
+export const accountGradients = {
+  gcash: ['#0b6fd0', '#00a3ff'],
+  bdo: ['#0b2f6b', '#1552a8'],
+  cash: ['#0f766e', '#16a34a'],
+  other: ['#1e3a8a', '#2563eb'],
 }
 
 /* A single, quiet elevation level — used sparingly for raised or floating surfaces. */

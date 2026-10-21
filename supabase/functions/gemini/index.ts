@@ -147,6 +147,29 @@ const ACTION_RULES = [
   'For add_debt put the other person in args.counterparty, the amount in args.amount, args.direction "owed_to_me" when they owe the user or "i_owe" when the user owes them, and any deadline in args.due. For settle_debt and delete_debt put the person in args.counterparty.',
 ].join(' ')
 
+const NOTE_TAGS = ['Work', 'Study', 'Idea', 'Personal'] as const
+
+const NOTE_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    tag: { type: 'string', enum: [...NOTE_TAGS] },
+    body: { type: 'string' },
+  },
+  required: ['title', 'tag', 'body'],
+  propertyOrdering: ['title', 'tag', 'body'],
+}
+
+const NOTE_RULES = [
+  'You draft one plain-text note for a private personal app, using only the topic the user typed.',
+  'Return JSON only.',
+  'title is a clear, specific title of at most 80 characters.',
+  'body is 120-350 words of plain text. Use short paragraphs or a plain hyphen list. Do not use markdown headings, bold, italic, code fences, or tables.',
+  'tag must be exactly one of Work, Study, Idea or Personal.',
+  'Do not invent facts about the user or their records. Do not ask follow-up questions; produce the best usable draft.',
+  'When the topic involves current procedures, government requirements, fees, deadlines, law, health or money, avoid presenting uncertain specifics as fact. Keep those details general and end the body with one short line: Check the official source before acting.',
+].join(' ')
+
 const PLAN_SCHEMA = {
   type: 'object',
   properties: {
@@ -191,6 +214,54 @@ const ASSESS_RULES = [
   'verdict "pass" only if the submission plausibly satisfies the criteria; otherwise "fail".',
   'score is 0-100. feedback is 1-3 concrete sentences: what was met and what is thin.',
   'Be strict but fair, and never reward effort described without any deliverable.',
+].join(' ')
+
+const SLEEP_SCHEMA = {
+  type: 'object',
+  properties: {
+    rating: { type: 'number' },
+    breakdown: {
+      type: 'object',
+      properties: {
+        duration_fit: { type: 'number' },
+        daytime_energy: { type: 'number' },
+        nap_quality: { type: 'number' },
+        continuity: { type: 'number' },
+      },
+      required: ['duration_fit', 'daytime_energy', 'nap_quality', 'continuity'],
+    },
+    feedback: { type: 'string' },
+  },
+  required: ['rating', 'breakdown', 'feedback'],
+}
+
+const SLEEP_RULES = [
+  'You assess one day of sleep for a private personal app.',
+  'Return JSON only. Use only the sessions, timestamped notes, and recent history given; never invent facts.',
+  'The daily score is analytic and individual. Infer personal sleep need from recent notes and performance instead of assuming one universal target like eight hours.',
+  'Produce four subscores: duration_fit 0-30, daytime_energy 0-30, nap_quality 0-20, and continuity 0-20. Their sum is the 0-100 daily score.',
+  'duration_fit compares total sleep with the user\'s inferred personal need and how they felt afterward. daytime_energy judges reported energy, focus, mood, grogginess, and daytime performance.',
+  'nap_quality judges naps separately. A short 5-20 minute nap can be helpful after short sleep and reported sleep pressure. Late or long naps reduce this subscore. No nap means full nap_quality unless notes show unresolved sleep pressure.',
+  'continuity judges night-sleep fragmentation, bedtime timing, and consistency with the recent pattern. Do not count a deliberate nap as night fragmentation.',
+  'rating is a separate integer from 1 to 5: 1 bad, 2 poor, 3 okay, 4 good, 5 excellent.',
+  'Be conservative when notes are thin, and say what is missing. Do not diagnose or treat medical conditions; suggest professional advice for serious symptoms.',
+  'feedback is 2-4 short sentences explaining the strongest positive and negative signals and one concrete suggestion. No markdown.',
+].join(' ')
+
+const SLEEP_RECAP_RULES = [
+  'You summarize sleep performance for a private personal app.',
+  'Use only the daily scores, sessions, ratings, notes, and computed totals in the context. Never invent facts or numbers.',
+  'Write 3-5 short conversational sentences. Mention the overall pattern, one thing that helped, one thing that hurt, and one concrete suggestion.',
+  'Respect the user\'s personal sleep need as shown by their notes; do not assume a universal eight-hour target.',
+  'Do not diagnose or treat medical conditions. No markdown headings.',
+].join(' ')
+
+const FINANCE_SCORE_RULES = [
+  'You explain a weekly personal finance score for a private app.',
+  'Use only the score, component points, and aggregate signals in the context. Never invent transactions, amounts, merchants, account names, or income.',
+  'Write 2-4 short conversational sentences. Say what is going well, name the weakest component, and give one concrete action for the coming week.',
+  'The score is a four-week rolling check-in, not a judgment of the user. Keep the tone calm and practical.',
+  'Do not give investment, tax, or legal advice, and do not shame the user about debt or spending. No markdown headings.',
 ].join(' ')
 
 const COURSE_SCHEMA = {
@@ -304,7 +375,11 @@ const BASE_RULES = [
 
 function systemFor(task: string) {
   if (task === 'extract-action') return ACTION_RULES
+  if (task === 'generate-note') return NOTE_RULES
   if (task === 'assess-submission') return ASSESS_RULES
+  if (task === 'assess-sleep') return SLEEP_RULES
+  if (task === 'sleep-recap') return SLEEP_RECAP_RULES
+  if (task === 'explain-finance') return FINANCE_SCORE_RULES
   if (task === 'summarize-note') {
     return `${BASE_RULES} The user has explicitly asked you to summarize one note. Keep it to two sentences.`
   }
@@ -339,6 +414,19 @@ function requestFor(task: string, question: string, context: string) {
     }
   }
 
+  if (task === 'generate-note') {
+    return {
+      systemInstruction: { parts: [{ text: NOTE_RULES }] },
+      contents: [{ role: 'user', parts: [{ text: `Topic: ${question}` }] }],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 1200,
+        responseMimeType: 'application/json',
+        responseSchema: NOTE_SCHEMA,
+      },
+    }
+  }
+
   if (task === 'generate-plan') {
     return {
       systemInstruction: { parts: [{ text: PLAN_RULES }] },
@@ -361,6 +449,19 @@ function requestFor(task: string, question: string, context: string) {
         maxOutputTokens: 300,
         responseMimeType: 'application/json',
         responseSchema: ASSESS_SCHEMA,
+      },
+    }
+  }
+
+  if (task === 'assess-sleep') {
+    return {
+      systemInstruction: { parts: [{ text: SLEEP_RULES }] },
+      contents: [{ role: 'user', parts: [{ text: `${question}\n\n${context}` }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 300,
+        responseMimeType: 'application/json',
+        responseSchema: SLEEP_SCHEMA,
       },
     }
   }
@@ -504,6 +605,26 @@ Deno.serve(async (req) => {
     })
   }
 
+  if (task === 'generate-note') {
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return json({ error: 'bad-note' }, 502)
+    }
+    const title = String(parsed?.title || '').slice(0, 120).trim()
+    const body = String(parsed?.body || '').slice(0, 6000).trim()
+    const rawTag = String(parsed?.tag || '').trim()
+    const tag = NOTE_TAGS.find((value) => value.toLowerCase() === rawTag.toLowerCase()) || 'Personal'
+    if (!title || !body) return json({ error: 'bad-note' }, 502)
+    return json({
+      json: { title, body, tag },
+      model: MODEL,
+      remaining: Math.max(0, DAILY_CAP - used),
+      cap: DAILY_CAP,
+    })
+  }
+
   if (task === 'generate-plan') {
     let parsed: any
     try {
@@ -535,6 +656,41 @@ Deno.serve(async (req) => {
     if (!feedback) return json({ error: 'bad-assessment' }, 502)
     return json({
       json: { verdict, score, feedback },
+      model: MODEL,
+      remaining: Math.max(0, DAILY_CAP - used),
+      cap: DAILY_CAP,
+    })
+  }
+
+  if (task === 'assess-sleep') {
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return json({ error: 'bad-sleep-assessment' }, 502)
+    }
+    const rawRating = Number(parsed?.rating)
+    if (!Number.isFinite(rawRating)) return json({ error: 'bad-sleep-assessment' }, 502)
+    const rating = Math.max(1, Math.min(5, Math.round(rawRating)))
+    const rawBreakdown = parsed?.breakdown
+    const durationFit = Number(rawBreakdown?.duration_fit)
+    const daytimeEnergy = Number(rawBreakdown?.daytime_energy)
+    const napQuality = Number(rawBreakdown?.nap_quality)
+    const continuity = Number(rawBreakdown?.continuity)
+    if (![durationFit, daytimeEnergy, napQuality, continuity].every(Number.isFinite)) {
+      return json({ error: 'bad-sleep-assessment' }, 502)
+    }
+    const breakdown = {
+      duration_fit: Math.max(0, Math.min(30, Math.round(durationFit))),
+      daytime_energy: Math.max(0, Math.min(30, Math.round(daytimeEnergy))),
+      nap_quality: Math.max(0, Math.min(20, Math.round(napQuality))),
+      continuity: Math.max(0, Math.min(20, Math.round(continuity))),
+    }
+    const score = breakdown.duration_fit + breakdown.daytime_energy + breakdown.nap_quality + breakdown.continuity
+    const feedback = String(parsed?.feedback || '').slice(0, 600).trim()
+    if (!feedback) return json({ error: 'bad-sleep-assessment' }, 502)
+    return json({
+      json: { rating, score, breakdown, feedback },
       model: MODEL,
       remaining: Math.max(0, DAILY_CAP - used),
       cap: DAILY_CAP,

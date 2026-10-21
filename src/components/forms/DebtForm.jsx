@@ -29,6 +29,7 @@ export default function DebtForm({ visible, onClose, record, defaultDirection })
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCounterparty(record?.counterparty ?? '')
     setDirection(
       DEBT_DIRECTION_LABELS[record?.direction ?? defaultDirection] ?? DEBT_DIRECTION_LABELS.owed_to_me,

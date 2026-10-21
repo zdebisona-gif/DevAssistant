@@ -19,6 +19,7 @@ export default function ChangePasswordForm({ visible, onClose }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrent('')
     setNext('')
     setConfirm('')

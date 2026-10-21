@@ -7,6 +7,7 @@ import {
   Check,
   HandCoins,
   PencilSimple,
+  Plus,
   Trash,
 } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
@@ -15,10 +16,10 @@ import ErrorState from '../components/ui/ErrorState.jsx'
 import HideToggle from '../components/ui/HideToggle.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
-import QuickAsk from '../components/ui/QuickAsk.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import AccountCard from '../components/ui/AccountCard.jsx'
+import FinanceScoreCard from '../components/finance/FinanceScoreCard.jsx'
 import AccountForm from '../components/forms/AccountForm.jsx'
 import AdjustAccountSheet from '../components/forms/AdjustAccountSheet.jsx'
 import BudgetForm from '../components/forms/BudgetForm.jsx'
@@ -31,7 +32,7 @@ import { DEBT_DIRECTION_LABELS } from '../data/constants.js'
 import { useData } from '../data/store.jsx'
 import { usePrivacy } from '../data/privacy.jsx'
 import { accountRows, debtDueLabel, openDebts, settledDebts, totalInAccounts } from '../lib/accounts.js'
-import { confirmDelete } from '../lib/alerts.js'
+import { confirmDelete, reportError } from '../lib/alerts.js'
 import { useRowActions } from '../lib/rowActions.jsx'
 import {
   budgetProgress,
@@ -40,7 +41,8 @@ import {
   totalsForMonth,
   totalsForPrevMonth,
 } from '../lib/analytics.js'
-import { money, moneyOr } from '../lib/format.js'
+import { financeScore, financeScoreHistory } from '../lib/finance.js'
+import { money, moneyAbs, moneyOr } from '../lib/format.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 export default function Finances() {
@@ -56,7 +58,8 @@ export default function Finances() {
     deleteDebt,
     settleDebt,
   } = useData()
-  const { hidden } = usePrivacy()
+  const { hidden, accountsHidden } = usePrivacy()
+  const accountHidden = hidden || accountsHidden
   const [expanded, setExpanded] = useState(false)
   const [settledOpen, setSettledOpen] = useState(false)
   const [txOpen, setTxOpen] = useState(false)
@@ -123,7 +126,7 @@ export default function Finances() {
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(tx.merchant, () => deleteTransaction(tx.id).catch(() => {})),
+          onPress: () => confirmDelete(tx.merchant, () => deleteTransaction(tx.id).catch(reportError)),
         },
       ],
     })
@@ -139,7 +142,7 @@ export default function Finances() {
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(row.category, () => deleteBudget(row.id).catch(() => {})),
+          onPress: () => confirmDelete(row.category, () => deleteBudget(row.id).catch(reportError)),
         },
       ],
     })
@@ -147,7 +150,7 @@ export default function Finances() {
   const accountActions = (account) =>
     open({
       title: account.name,
-      subtitle: `Balance ${moneyOr(account.balance, hidden, 2)}`,
+      subtitle: `Balance ${moneyOr(account.balance, accountHidden, 2)}`,
       actions: [
         { key: 'adjust', label: 'Adjust balance', icon: HandCoins, onPress: () => setAdjust({ account, mode: 'add' }) },
         { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditAccount(account) },
@@ -157,7 +160,7 @@ export default function Finances() {
           icon: Trash,
           destructive: true,
           onPress: () =>
-            confirmDelete(account.name, () => deleteAccount(account.id).catch(() => {})),
+            confirmDelete(account.name, () => deleteAccount(account.id).catch(reportError)),
         },
       ],
     })
@@ -165,20 +168,20 @@ export default function Finances() {
   const debtActions = (debt) =>
     open({
       title: debt.counterparty,
-      subtitle: `${DEBT_DIRECTION_LABELS[debt.direction]} · ${money(debt.amount, 2)}`,
+      subtitle: `${DEBT_DIRECTION_LABELS[debt.direction]} · ${moneyOr(debt.amount, hidden, 2)}`,
       actions: [
         debt.settled
           ? {
               key: 'reopen',
               label: 'Mark as unsettled',
               icon: HandCoins,
-              onPress: () => settleDebt(debt.id, false).catch(() => {}),
+              onPress: () => settleDebt(debt.id, false).catch(reportError),
             }
           : {
               key: 'settle',
               label: 'Settle',
               icon: Check,
-              onPress: () => settleDebt(debt.id, true).catch(() => {}),
+              onPress: () => settleDebt(debt.id, true).catch(reportError),
             },
         { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditDebt(debt) },
         {
@@ -186,7 +189,7 @@ export default function Finances() {
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(debt.counterparty, () => deleteDebt(debt.id).catch(() => {})),
+          onPress: () => confirmDelete(debt.counterparty, () => deleteDebt(debt.id).catch(reportError)),
         },
       ],
     })
@@ -217,6 +220,8 @@ export default function Finances() {
   const net = income - spend
   const accounts = accountRows(data)
   const accountsTotal = totalInAccounts(data)
+  const score = financeScore(data)
+  const scoreHistory = financeScoreHistory(data)
   const owedToMe = openDebts(data.debts).filter((debt) => debt.direction !== 'i_owe')
   const iOwe = openDebts(data.debts).filter((debt) => debt.direction === 'i_owe')
   const settled = settledDebts(data.debts)
@@ -282,13 +287,15 @@ export default function Finances() {
 
   return (
     <Screen title="Money" subtitle="This month · all accounts" right={<HideToggle />}>
-      <QuickAsk />
       <Section
         title="Accounts"
         action={
-          <Button size="sm" variant="ghost" onPress={openNewAccount}>
-            Add
-          </Button>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <HideToggle scope="accounts" />
+            <Button size="sm" variant="ghost" onPress={openNewAccount}>
+              Add
+            </Button>
+          </View>
         }
       >
         {accounts.length ? (
@@ -313,7 +320,7 @@ export default function Finances() {
                   fontVariant: ['tabular-nums'],
                 }}
               >
-                {moneyOr(accountsTotal, hidden, 2)}
+                {moneyOr(accountsTotal, accountHidden, 2)}
               </Text>
             </View>
             <ScrollView
@@ -325,7 +332,7 @@ export default function Finances() {
                 <AccountCard
                   key={account.id}
                   account={account}
-                  hidden={hidden}
+                  hidden={accountHidden}
                   onEdit={openEditAccount}
                   onAdjust={(row, mode) => setAdjust({ account: row, mode })}
                   onMenu={accountActions}
@@ -355,14 +362,30 @@ export default function Finances() {
           value={money(spend, 0)}
           delta={spendDelta}
           deltaIsGood={false}
-          hint={budgetTotal > 0 ? `${money(remaining, 0)} left of ${money(budgetTotal, 0)}` : 'Set a budget below'}
+          hint={
+            budgetTotal > 0
+              ? remaining < 0
+                ? `${moneyAbs(remaining, 0)} over budget`
+                : `${money(remaining, 0)} left of ${money(budgetTotal, 0)}`
+              : 'Set a budget below'
+          }
         />
         <StatCard
           label="Net this month"
-          value={net < 0 ? `−${money(net, 0)}` : money(net, 0)}
+          value={money(net, 0)}
           hint={`${money(income, 0)} in · ${money(spend, 0)} out`}
         />
       </View>
+
+      <FinanceScoreCard
+        result={score}
+        history={scoreHistory}
+        privacy={{ hidden, accountsHidden }}
+      />
+
+      <Button variant="primary" icon={Plus} onPress={openNewTx}>
+        Add transaction
+      </Button>
 
       <Section
         title="Debts"
@@ -531,7 +554,7 @@ export default function Finances() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setExpanded((value) => !value)}
-                hitSlop={8}
+                hitSlop={16}
               >
                 <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
                   {expanded ? 'Show less' : `All ${transactions.length}`}
@@ -589,7 +612,7 @@ export default function Finances() {
                     }}
                   >
                     {positive ? '+' : '−'}
-                    {money(tx.amount, 2)}
+                    {moneyAbs(tx.amount, 2)}
                   </Text>
                   <RowMenuButton
                     accessibilityLabel={`${tx.merchant}, more options`}

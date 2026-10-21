@@ -7,3 +7,11 @@ export function confirmDelete(title, onConfirm) {
     { text: 'Delete', style: 'destructive', onPress: onConfirm },
   ])
 }
+
+/** Surface a failed write instead of letting it pass silently. */
+export function reportError(error, title = "Couldn't save that") {
+  const detail = error?.message
+    ? String(error.message)
+    : 'Please check your connection and try again.'
+  Alert.alert(title, detail)
+}

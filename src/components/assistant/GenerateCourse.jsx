@@ -35,6 +35,7 @@ export default function GenerateCourse({ visible, onClose }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGoal('')
     setLevel('beginner')
     setStatus('idle')

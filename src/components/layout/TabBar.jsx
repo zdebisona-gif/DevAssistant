@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ACTION_COLUMN, ASK_ACTION, TAB_ITEMS } from '../../data/nav.js'
@@ -26,7 +26,7 @@ export default function TabBar({ state, navigation }) {
   const columns = TAB_ITEMS.length + 1
   const slot = width / columns
 
-  const slide = useRef(new Animated.Value(columnFor(state.index))).current
+  const [slide] = useState(() => new Animated.Value(columnFor(state.index)))
 
   useEffect(() => {
     Animated.timing(slide, {
@@ -47,12 +47,13 @@ export default function TabBar({ state, navigation }) {
       style={{
         backgroundColor: c.card,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: c.border,
+        borderTopColor: c.line,
         paddingBottom: insets.bottom,
       }}
     >
       <View
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+        accessibilityRole="tablist"
         style={{ height: BAR_HEIGHT, flexDirection: 'row' }}
       >
         {width > 0 ? (
@@ -73,7 +74,7 @@ export default function TabBar({ state, navigation }) {
 
         {TAB_ITEMS.flatMap((item, index) => {
           const focused = state.index === index
-          const tint = focused ? c.primaryFg : c.mutedForeground
+          const tint = focused ? c.foreground : c.mutedForeground
           const route = state.routes[index]
           const tab = (
             <Pressable

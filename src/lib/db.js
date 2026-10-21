@@ -23,6 +23,9 @@ export async function loadAll() {
     penalties,
     accounts,
     debts,
+    tasks,
+    sleepLogs,
+    sleepCreditEvents,
   ] = await Promise.all([
     selectAll('budgets', { column: 'category' }),
     selectAll('transactions', { column: 'occurred_on', ascending: false }),
@@ -36,6 +39,9 @@ export async function loadAll() {
     selectAll('project_penalties', { column: 'created_at', ascending: false }),
     selectAll('accounts', { column: 'position' }),
     selectAll('debts', { column: 'created_at', ascending: false }),
+    selectAll('tasks', { column: 'created_at', ascending: false }),
+    selectAll('sleep_logs', { column: 'log_date', ascending: false }),
+    selectAll('sleep_credit_events', { column: 'created_at', ascending: false }),
   ])
   return {
     budgets,
@@ -50,6 +56,9 @@ export async function loadAll() {
     penalties,
     accounts,
     debts,
+    tasks,
+    sleepLogs,
+    sleepCreditEvents,
   }
 }
 
@@ -117,6 +126,14 @@ export const deleteAccount = (id) => remove('accounts', id)
 export const addDebt = (row) => insert('debts', row)
 export const updateDebt = (id, patch) => update('debts', id, patch)
 export const deleteDebt = (id) => remove('debts', id)
+
+export const addTask = (row) => insert('tasks', row)
+export const updateTask = (id, patch) => update('tasks', id, patch)
+export const deleteTask = (id) => remove('tasks', id)
+
+export const addSleepLog = (row) => insert('sleep_logs', row)
+export const updateSleepLog = (id, patch) => update('sleep_logs', id, patch)
+export const deleteSleepLog = (id) => remove('sleep_logs', id)
 
 /** Wipe every record the signed-in account owns. Scoped server-side by auth.uid(). */
 export async function deleteAllData() {

@@ -19,6 +19,7 @@ export default function LessonQuiz({ visible, course, module, lesson, onClose })
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus('idle')
     setQuestions([])
     setAnswers({})
@@ -116,7 +117,7 @@ export default function LessonQuiz({ visible, course, module, lesson, onClose })
                           isCorrect ? (
                             <Check size={15} weight="bold" color={c.success} />
                           ) : (
-                            <WarningCircle size={15} weight="bold" color={c.destructive} />
+                            <WarningCircle size={15} weight="bold" color={c.destructiveText} />
                           )
                         ) : null}
                         <Text

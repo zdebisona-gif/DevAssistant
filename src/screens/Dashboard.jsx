@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { CalendarBlank, Check, Fire, Notebook, Plus, Target, Wallet } from '../icons.js'
+import { CaretRight, Check, Fire, Moon, Plus, Target } from '../icons.js'
 import { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Button from '../components/ui/Button.jsx'
@@ -7,6 +7,7 @@ import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
+import FinanceScoreCard from '../components/finance/FinanceScoreCard.jsx'
 import TrendAreaChart, { ChartLegend } from '../components/charts/TrendAreaChart.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
@@ -16,21 +17,24 @@ import StatCard from '../components/ui/StatCard.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
 import { USER } from '../data/constants.js'
 import { useData } from '../data/store.jsx'
+import { usePrivacy } from '../data/privacy.jsx'
 import {
   buildTrend,
   budgetsForMonth,
   currentStreak,
   entriesOn,
   entryTimeLabel,
-  isoWeek,
   netTotal,
   percentChange,
   todayISO,
   totalsForMonth,
   totalsForPrevMonth,
 } from '../lib/analytics.js'
-import { greeting, money } from '../lib/format.js'
+import { financeScore, financeScoreHistory } from '../lib/finance.js'
+import { greeting, money, moneyAbs } from '../lib/format.js'
+import { reportError } from '../lib/alerts.js'
 import { creditBalance, dueMeta, sortProjects } from '../lib/projects.js'
+import { sleepCreditScore } from '../lib/sleep.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 const TODAY = new Date().toLocaleDateString(undefined, {
@@ -84,7 +88,7 @@ function Today({ entries, onToggle, onAdd }) {
               key={entry.id}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: entry.done }}
-              onPress={() => onToggle(entry.id, !entry.done).catch(() => {})}
+              onPress={() => onToggle(entry.id, !entry.done).catch(reportError)}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -150,12 +154,13 @@ function Today({ entries, onToggle, onAdd }) {
   )
 }
 
-function GlanceRow({ icon: Icon, label, value, to }) {
+function MoreRow({ icon: Icon, label, value, to }) {
   const { c, fonts, text } = useTheme()
   const router = useRouter()
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${label}, ${value}`}
       onPress={() => router.push(to)}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -191,6 +196,7 @@ function GlanceRow({ icon: Icon, label, value, to }) {
       >
         {value}
       </Text>
+      <CaretRight size={14} weight="bold" color={c.mutedForeground} />
     </Pressable>
   )
 }
@@ -232,7 +238,7 @@ function DueRow({ project }) {
         style={{
           fontFamily: fonts.mono,
           fontSize: text.micro,
-          color: meta.overdue ? c.destructive : c.mutedForeground,
+                color: meta.overdue ? c.destructiveText : c.mutedForeground,
           fontVariant: ['tabular-nums'],
         }}
       >
@@ -245,6 +251,8 @@ function DueRow({ project }) {
 export default function Dashboard() {
   const { c, fonts, radius, text } = useTheme()
   const { data, loading, error, reload, togglePlanEntry } = useData()
+  const { hidden, accountsHidden } = usePrivacy()
+  const router = useRouter()
   const [range, setRange] = useState(12)
   const [formOpen, setFormOpen] = useState(false)
 
@@ -266,7 +274,7 @@ export default function Dashboard() {
     )
   }
 
-  const { income, spend } = totalsForMonth(data.transactions)
+  const { spend } = totalsForMonth(data.transactions)
   const spendDelta = percentChange(spend, totalsForPrevMonth(data.transactions).spend)
   const net = netTotal(data.transactions)
   const budgetTotal = budgetsForMonth(data.budgets).reduce(
@@ -278,6 +286,9 @@ export default function Dashboard() {
   const streak = currentStreak(data.sessions)
   const activeProjects = sortProjects(data.projects).filter((project) => project.status === 'active')
   const credits = creditBalance(data.penalties)
+  const sleep = sleepCreditScore(data.sleepCreditEvents)
+  const moneyScore = financeScore(data)
+  const moneyScoreHistory = financeScoreHistory(data)
 
   return (
     <Screen
@@ -295,16 +306,32 @@ export default function Dashboard() {
       <View style={{ flexDirection: 'row', gap: 16 }}>
         <StatCard
           label="Net balance"
-          value={net < 0 ? `−${money(net)}` : money(net)}
+          value={money(net)}
         />
         <StatCard
           label="Spent this month"
           value={money(spend, 0)}
           delta={spendDelta}
           deltaIsGood={false}
-          hint={budgetTotal > 0 ? `${money(remaining, 0)} left of ${money(budgetTotal, 0)}` : 'Add a budget to track this'}
+          hint={
+            budgetTotal > 0
+              ? remaining < 0
+                ? `${moneyAbs(remaining, 0)} over budget`
+                : `${money(remaining, 0)} left of ${money(budgetTotal, 0)}`
+              : 'Add a budget to track this'
+          }
         />
       </View>
+
+      <FinanceScoreCard
+        compact
+        result={moneyScore}
+        history={moneyScoreHistory}
+        privacy={{ hidden, accountsHidden }}
+        onPress={() => router.push('/finances')}
+      />
+
+      <Today entries={today} onToggle={togglePlanEntry} onAdd={() => setFormOpen(true)} />
 
       <Section
         title="Spending vs income"
@@ -319,6 +346,10 @@ export default function Dashboard() {
                   accessibilityState={{ selected: active }}
                   onPress={() => setRange(months)}
                   style={{
+                    minHeight: 44,
+                    minWidth: 44,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     paddingHorizontal: 12,
                     paddingVertical: 5,
                     borderRadius: radius.pill,
@@ -355,8 +386,6 @@ export default function Dashboard() {
         </Card>
       </Section>
 
-      <Today entries={today} onToggle={togglePlanEntry} onAdd={() => setFormOpen(true)} />
-
       {activeProjects.length ? (
         <Section
           title="Due soon"
@@ -379,31 +408,31 @@ export default function Dashboard() {
         </Section>
       ) : null}
 
-      <Section title="At a glance">
+      <Section title="More">
         <Card>
-          <GlanceRow icon={Notebook} label="Notes" value={`${data.notes.length}`} to="/notes" />
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
-          <GlanceRow
-            icon={Wallet}
-            label="Budget left"
-            value={budgetTotal > 0 ? money(remaining, 0) : '—'}
-            to="/finances"
-          />
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
-          <GlanceRow
+          <MoreRow
             icon={Fire}
-            label="Learning streak"
-            value={`${streak} days`}
+            label="Learning"
+            value={`${streak} ${streak === 1 ? 'day' : 'days'}`}
             to="/learning"
           />
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
-          <GlanceRow icon={CalendarBlank} label="Planner" value={`Week ${isoWeek()}`} to="/planner" />
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
-          <GlanceRow
+          <MoreRow
             icon={Target}
             label="Projects"
             value={`${activeProjects.length} active`}
             to="/projects"
+          />
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.line, marginLeft: 62 }} />
+          <MoreRow
+            icon={Moon}
+            label="Sleep"
+            value={
+              data.sleepLogs.length || data.sleepCreditEvents.length
+                ? `${sleep > 0 ? '+' : ''}${sleep} points`
+                : 'No logs'
+            }
+            to="/sleep"
           />
         </Card>
       </Section>

@@ -13,6 +13,7 @@ import { useAuth } from '../data/auth.jsx'
 import { remainingToday, useAiPrefs } from '../data/aiPrefs.jsx'
 import { usePrivacy } from '../data/privacy.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
+import { reportError } from '../lib/alerts.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 function Row({ label, value, onPress, right }) {
@@ -66,16 +67,17 @@ function CountRow({ label, count }) {
 
 export default function Settings() {
   const { c, fonts, text } = useTheme()
-  const { data, reload } = useData()
+  const { data, loading, error, reload } = useData()
   const { user, signOut } = useAuth()
   const { reset } = useOnboarding()
   const { enabled: aiEnabled, setEnabled: setAiEnabled, usage } = useAiPrefs()
-  const { hidden, setHidden } = usePrivacy()
+  const { hidden, setHidden, accountsHidden, setAccountsHidden } = usePrivacy()
   const router = useRouter()
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [passwordChanged, setPasswordChanged] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [dataDeleted, setDataDeleted] = useState(false)
+  const [countsOpen, setCountsOpen] = useState(false)
 
   const remaining = remainingToday(usage)
   const cap = usage?.cap ?? 50
@@ -110,14 +112,14 @@ export default function Settings() {
         text: 'Sign out',
         style: 'destructive',
         onPress: () => {
-          signOut().catch(() => {})
+          signOut().catch(reportError)
         },
       },
     ])
   }
 
   return (
-    <Screen title="Settings" subtitle="Account, appearance, intro and data" left="back">
+    <Screen title="Settings" subtitle="Account, appearance, intro and data" left="back" tabbed={false}>
       <Card>
         <CardHeader title="Account" subtitle="This device stays signed in" />
         <CardBody style={{ gap: 10 }}>
@@ -146,7 +148,7 @@ export default function Settings() {
         <Row
           label="Sign out"
           onPress={confirmSignOut}
-          right={<SignOut size={14} weight="bold" color={c.destructive} />}
+          right={<SignOut size={14} weight="bold" color={c.destructiveText} />}
         />
       </Card>
 
@@ -180,18 +182,47 @@ export default function Settings() {
             />
           }
         />
+        <Row
+          label="Hide account balances only"
+          onPress={
+            hidden
+              ? null
+              : () => {
+                  Haptics.selectionAsync().catch(() => {})
+                  setAccountsHidden(!accountsHidden)
+                }
+          }
+          right={
+            <Switch
+              value={accountsHidden}
+              disabled={hidden}
+              onValueChange={(next) => {
+                Haptics.selectionAsync().catch(() => {})
+                setAccountsHidden(next)
+              }}
+              trackColor={{ false: c.border, true: c.primary }}
+              thumbColor={c.card}
+            />
+          }
+        />
         <CardBody style={{ gap: 8 }}>
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
           >
-            Masks account balances, the total in your accounts and debt amounts as ₱••••••. Spending,
-            budgets and transaction amounts stay visible.
+            Hide balances masks account balances, the total in your accounts and debt amounts as ₱••••••.
+            Spending, budgets and transaction amounts stay visible.
           </Text>
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
           >
-            While it is on, hidden balances are also left out of the context Zen-I sends to Gemini.
-            This setting is per device.
+            Hide account balances only masks account cards and the accounts total. Debts and spending
+            stay visible. Hide balances overrides it while on.
+          </Text>
+          <Text
+            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+          >
+            Hidden account balances are left out of the context Zen-I sends to Gemini. Both settings
+            are per device.
           </Text>
         </CardBody>
       </Card>
@@ -247,9 +278,9 @@ export default function Settings() {
       <Card>
         <CardHeader
           title="Data"
-          subtitle="Live from your account"
+          subtitle={loading ? 'Syncing…' : error ? 'Couldn’t refresh' : 'Live from your account'}
           action={
-            <Pressable accessibilityRole="button" onPress={() => reload()} hitSlop={8}>
+            <Pressable accessibilityRole="button" onPress={() => reload()} hitSlop={16}>
               <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
                 Refresh
               </Text>
@@ -258,23 +289,59 @@ export default function Settings() {
         />
         <CardBody style={{ gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Database size={14} weight="bold" color={c.mutedForeground} />
-            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-              Connected · v0.3
+            <Database size={14} weight="bold" color={error ? c.destructiveText : c.mutedForeground} />
+            <Text
+              style={{
+                fontFamily: fonts.sans,
+                fontSize: text.caption,
+                color: error ? c.destructiveText : c.mutedForeground,
+              }}
+            >
+              {loading ? 'Syncing records…' : error ? 'Couldn’t reach your account' : 'Connected · live'}
             </Text>
           </View>
-          <View style={{ gap: 8 }}>
-            <CountRow label="Notes" count={data.notes.length} />
-            <CountRow label="Transactions" count={data.transactions.length} />
-            <CountRow label="Accounts" count={data.accounts.length} />
-            <CountRow label="Debts" count={data.debts.length} />
-            <CountRow label="Budgets" count={data.budgets.length} />
-            <CountRow label="Plan entries" count={data.planner.length} />
-            <CountRow label="Courses" count={data.courses.length} />
-            <CountRow label="Study sessions" count={data.sessions.length} />
-            <CountRow label="Projects" count={data.projects.length} />
-            <CountRow label="Penalties" count={data.penalties.length} />
-          </View>
+          {error ? (
+            <Text
+              style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
+            >
+              Records shown are from the last successful sync. Use Refresh to try again.
+            </Text>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: countsOpen }}
+            onPress={() => setCountsOpen((value) => !value)}
+            style={{
+              minHeight: 44,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+              Record counts
+            </Text>
+            <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
+              {countsOpen ? 'Hide' : 'Show'}
+            </Text>
+          </Pressable>
+          {countsOpen ? (
+            <View style={{ gap: 8 }}>
+              <CountRow label="Notes" count={data.notes.length} />
+              <CountRow label="Transactions" count={data.transactions.length} />
+              <CountRow label="Accounts" count={data.accounts.length} />
+              <CountRow label="Debts" count={data.debts.length} />
+              <CountRow label="Budgets" count={data.budgets.length} />
+              <CountRow label="Plan entries" count={data.planner.length} />
+              <CountRow label="Tasks" count={data.tasks.length} />
+              <CountRow label="Sleep logs" count={data.sleepLogs.length} />
+              <CountRow label="Sleep score events" count={data.sleepCreditEvents.length} />
+              <CountRow label="Courses" count={data.courses.length} />
+              <CountRow label="Study sessions" count={data.sessions.length} />
+              <CountRow label="Projects" count={data.projects.length} />
+              <CountRow label="Penalties" count={data.penalties.length} />
+            </View>
+          ) : null}
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
           >
@@ -298,15 +365,16 @@ export default function Settings() {
             <Text
               style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
             >
-              Removes every note, transaction, budget, account, debt, plan entry, course, lesson,
-              study session and project in this account. Your sign-in and app settings stay.
+              Removes every note, transaction, budget, account, debt, plan entry, task, sleep
+              log, sleep credit history, course, lesson, study session and project in this
+              account. Your sign-in and app settings stay.
             </Text>
           )}
         </CardBody>
         <Row
           label="Delete all data"
           onPress={openDelete}
-          right={<Trash size={14} weight="bold" color={c.destructive} />}
+          right={<Trash size={14} weight="bold" color={c.destructiveText} />}
         />
       </Card>
 

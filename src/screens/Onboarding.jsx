@@ -240,7 +240,7 @@ export default function Onboarding() {
         }}
       >
         <Logo />
-        <Pressable accessibilityRole="button" onPress={finish} hitSlop={8}>
+        <Pressable accessibilityRole="button" onPress={finish} hitSlop={16}>
           <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.label, color: c.mutedForeground }}>
             Skip
           </Text>

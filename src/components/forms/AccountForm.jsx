@@ -5,9 +5,10 @@ import Field from '../ui/Field.jsx'
 import Sheet from '../ui/Sheet.jsx'
 import TagPicker from '../ui/TagPicker.jsx'
 import { ACCOUNT_KIND_LABELS, ACCOUNT_KINDS } from '../../data/constants.js'
+import { usePrivacy } from '../../data/privacy.jsx'
 import { useData } from '../../data/store.jsx'
 import { accountBalance } from '../../lib/accounts.js'
-import { money } from '../../lib/format.js'
+import { moneyOr } from '../../lib/format.js'
 import { validateAccount } from '../../lib/validation.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
@@ -17,6 +18,8 @@ const KIND_BY_LABEL = Object.fromEntries(ACCOUNT_KINDS.map((kind) => [ACCOUNT_KI
 export default function AccountForm({ visible, onClose, record }) {
   const { c, fonts, text } = useTheme()
   const { data, createAccount, updateAccount } = useData()
+  const { hidden, accountsHidden } = usePrivacy()
+  const accountHidden = hidden || accountsHidden
   const editing = Boolean(record)
   const [name, setName] = useState('')
   const [kind, setKind] = useState(ACCOUNT_KIND_LABELS.other)
@@ -26,6 +29,7 @@ export default function AccountForm({ visible, onClose, record }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(record?.name ?? '')
     setKind(ACCOUNT_KIND_LABELS[record?.kind] ?? ACCOUNT_KIND_LABELS.other)
     setOpening(record ? String(Number(record.opening_balance) || 0) : '')
@@ -61,7 +65,7 @@ export default function AccountForm({ visible, onClose, record }) {
       visible={visible}
       onClose={onClose}
       title={editing ? 'Edit account' : 'New account'}
-      subtitle={editing ? `Now ${money(live, 2)} with tagged spending` : 'Balances are tracked by hand'}
+      subtitle={editing ? `Now ${moneyOr(live, accountHidden, 2)} with tagged spending` : 'Balances are tracked by hand'}
     >
       <Field
         label="Name"

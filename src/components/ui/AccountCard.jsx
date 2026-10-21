@@ -3,6 +3,7 @@ import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { DotsThreeVertical, Minus, Plus } from '../../icons.js'
 import { ACCOUNT_KIND_LABELS } from '../../data/constants.js'
 import { moneyOr } from '../../lib/format.js'
+import { accountGradients } from '../../theme/tokens.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 /*
@@ -11,12 +12,7 @@ import { useTheme } from '../../theme/ThemeProvider.jsx'
  * plus the transactions tagged to it), so it moves when spending is logged against it.
  */
 
-const TONES = {
-  gcash: ['#0b6fd0', '#00a3ff'],
-  bdo: ['#0b2f6b', '#1552a8'],
-  cash: ['#0f766e', '#16a34a'],
-  other: ['#1e3a8a', '#2563eb'],
-}
+const TONES = accountGradients
 
 export const ACCOUNT_CARD_WIDTH = 280
 export const ACCOUNT_CARD_HEIGHT = 172
@@ -26,11 +22,14 @@ function CardIconButton({ icon: Icon, accessibilityLabel, onPress }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
+      onPress={(event) => {
+        event.stopPropagation()
+        onPress()
+      }}
       hitSlop={6}
       style={({ pressed }) => ({
-        width: 30,
-        height: 30,
+        width: 36,
+        height: 36,
         borderRadius: 999,
         alignItems: 'center',
         justifyContent: 'center',

@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Text, TextInput, View } from 'react-native'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
@@ -7,6 +8,7 @@ export default function Field({
   onChangeText,
   placeholder,
   hint,
+  error,
   multiline = false,
   keyboardType,
   autoFocus = false,
@@ -17,11 +19,18 @@ export default function Field({
   onSubmitEditing,
   returnKeyType,
   editable = true,
+  disabled = false,
 }) {
   const { c, fonts, radius, text } = useTheme()
+  const labelId = useId()
+  const enabled = editable && !disabled
+
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.mutedForeground }}>
+      <Text
+        nativeID={labelId}
+        style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.mutedForeground }}
+      >
         {label}
       </Text>
       <TextInput
@@ -38,12 +47,16 @@ export default function Field({
         textContentType={textContentType}
         onSubmitEditing={onSubmitEditing}
         returnKeyType={returnKeyType}
-        editable={editable}
+        editable={enabled}
+        accessibilityLabel={label}
+        accessibilityHint={error || undefined}
+        accessibilityLabelledBy={labelId}
+        accessibilityState={{ disabled: !enabled }}
         style={{
           minHeight: multiline ? 88 : 46,
           borderRadius: radius.md,
           borderWidth: 1,
-          borderColor: c.border,
+          borderColor: error ? c.destructive : c.border,
           backgroundColor: c.background,
           paddingHorizontal: 12,
           paddingTop: multiline ? 10 : 0,
@@ -52,9 +65,17 @@ export default function Field({
           fontFamily: fonts.sans,
           fontSize: text.body,
           textAlignVertical: multiline ? 'top' : 'center',
+          opacity: enabled ? 1 : 0.6,
         }}
       />
-      {hint ? (
+      {error ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.destructiveText }}
+        >
+          {error}
+        </Text>
+      ) : hint ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.mutedForeground }}>
           {hint}
         </Text>

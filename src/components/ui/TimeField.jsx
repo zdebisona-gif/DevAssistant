@@ -1,27 +1,39 @@
 import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { CaretRight } from '../../icons.js'
+import { formatClock12 } from '../../lib/format.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 import Chip from './Chip.jsx'
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i)
+const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 const MINUTES = [0, 15, 30, 45]
+const PERIODS = ['AM', 'PM']
 const pad = (n) => String(n).padStart(2, '0')
 
 function parse(value) {
   const match = /^(\d{1,2}):(\d{2})/.exec(value || '')
-  if (!match) return { hour: null, minute: null }
-  return { hour: Number(match[1]), minute: Number(match[2]) }
+  if (!match) return { hour24: null, minute: null, hour12: null, period: null }
+  const hour24 = Number(match[1])
+  if (hour24 > 23) return { hour24: null, minute: null, hour12: null, period: null }
+  return {
+    hour24,
+    minute: Number(match[2]),
+    hour12: hour24 % 12 || 12,
+    period: hour24 >= 12 ? 'PM' : 'AM',
+  }
 }
 
 export default function TimeField({ label, value, onChange, hint }) {
   const { c, fonts, radius, text } = useTheme()
   const [open, setOpen] = useState(false)
-  const { hour, minute } = parse(value)
+  const { hour12, minute, period } = parse(value)
 
-  const set = (nextHour, nextMinute) => {
-    if (nextHour == null || nextMinute == null) return
-    onChange(`${pad(nextHour)}:${pad(nextMinute)}`)
+  const set = (nextHour, nextMinute, nextPeriod) => {
+    const selectedHour = nextHour ?? hour12 ?? 12
+    const selectedMinute = nextMinute ?? minute ?? 0
+    const selectedPeriod = nextPeriod ?? period ?? 'AM'
+    const hour24 = (selectedHour % 12) + (selectedPeriod === 'PM' ? 12 : 0)
+    onChange(`${pad(hour24)}:${pad(selectedMinute)}`)
   }
 
   return (
@@ -31,7 +43,7 @@ export default function TimeField({ label, value, onChange, hint }) {
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${value || 'not set'}`}
+        accessibilityLabel={`${label}: ${formatClock12(value) || 'not set'}`}
         onPress={() => setOpen((prev) => !prev)}
         style={{
           minHeight: 46,
@@ -46,8 +58,8 @@ export default function TimeField({ label, value, onChange, hint }) {
           gap: 8,
         }}
       >
-        <Text style={{ fontFamily: fonts.sans, fontSize: text.body, color: value ? c.foreground : c.mutedForeground }}>
-          {value || 'No time'}
+        <Text style={{ fontFamily: fonts.mono, fontSize: text.body, color: value ? c.foreground : c.mutedForeground }}>
+          {formatClock12(value) || 'No time'}
         </Text>
         <CaretRight
           size={14}
@@ -63,8 +75,8 @@ export default function TimeField({ label, value, onChange, hint }) {
             <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.micro, color: c.mutedForeground }}>Hour</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {HOURS.map((h) => (
-                <Chip key={h} active={hour === h} onPress={() => set(h, minute ?? 0)}>
-                  {pad(h)}
+                <Chip key={h} active={hour12 === h} onPress={() => set(h, minute ?? 0, period)}>
+                  {h}
                 </Chip>
               ))}
             </View>
@@ -73,14 +85,29 @@ export default function TimeField({ label, value, onChange, hint }) {
             <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.micro, color: c.mutedForeground }}>Minute</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {MINUTES.map((m) => (
-                <Chip key={m} active={minute === m} onPress={() => set(hour ?? 9, m)}>
+                <Chip key={m} active={minute === m} onPress={() => set(hour12 ?? 12, m, period)}>
                   {pad(m)}
                 </Chip>
               ))}
             </View>
           </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.micro, color: c.mutedForeground }}>Period</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {PERIODS.map((p) => (
+                <Chip key={p} active={period === p} onPress={() => set(hour12 ?? 12, minute ?? 0, p)}>
+                  {p}
+                </Chip>
+              ))}
+            </View>
+          </View>
           {value ? (
-            <Pressable accessibilityRole="button" onPress={() => onChange('')} hitSlop={6}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onChange('')}
+              hitSlop={6}
+              style={{ minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center' }}
+            >
               <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>Clear</Text>
             </Pressable>
           ) : null}

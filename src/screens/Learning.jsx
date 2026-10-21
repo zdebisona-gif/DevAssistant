@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { BookOpen, PencilSimple, Play, Plus, Sparkle, Trash } from '../icons.js'
+import { BookOpen, PencilSimple, Play, Sparkle, Trash } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
@@ -20,7 +20,8 @@ import { Card } from '../components/ui/Card.jsx'
 import { LEARNING_GOAL_HOURS } from '../data/constants.js'
 import { formatElapsed, useFocus } from '../data/focus.jsx'
 import { useData } from '../data/store.jsx'
-import { confirmDelete } from '../lib/alerts.js'
+import { confirmDelete, reportError } from '../lib/alerts.js'
+import { formatClock12 } from '../lib/format.js'
 import { continueTarget, courseProgress, coursesTree, learningStats } from '../lib/learning.js'
 import { useRowActions } from '../lib/rowActions.jsx'
 import {
@@ -83,7 +84,7 @@ export default function Learning() {
           icon: Trash,
           destructive: true,
           onPress: () =>
-            confirmDelete(course.name, () => deleteCourse(course.id).catch(() => {})),
+            confirmDelete(course.name, () => deleteCourse(course.id).catch(reportError)),
         },
       ],
     })
@@ -110,7 +111,7 @@ export default function Learning() {
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(`${Number(record.hours)}h session`, () => deleteSession(id).catch(() => {})),
+          onPress: () => confirmDelete(`${Number(record.hours)}h session`, () => deleteSession(id).catch(reportError)),
         },
       ],
     })
@@ -150,7 +151,7 @@ export default function Learning() {
   const courseName = (id) => data.courses.find((course) => course.id === id)?.name
 
   return (
-    <Screen title="Learning" subtitle="Courses, lessons and study hours" left="back">
+    <Screen title="Learning" subtitle="Courses, lessons and study hours" left="back" tabbed={false}>
       {target ? (
         <Section title="Continue learning">
           <Card padded>
@@ -364,7 +365,7 @@ export default function Learning() {
                 }}
               >
                 <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                  {block.start_time ? String(block.start_time).slice(0, 5) : '—'}
+                  {block.start_time ? formatClock12(block.start_time) : '—'}
                 </Text>
                 <Text
                   numberOfLines={1}

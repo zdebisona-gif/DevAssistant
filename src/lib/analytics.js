@@ -3,6 +3,8 @@
  * Every figure the UI shows is computed here from raw Supabase rows.
  */
 
+import { formatClock12 } from './format.js'
+
 export const MONTHS = [
   'Jan',
   'Feb',
@@ -181,7 +183,7 @@ export function recentSessions(sessions, limit = 5) {
 
 function timeLabel(value) {
   if (!value) return null
-  return String(value).slice(0, 5)
+  return formatClock12(value)
 }
 
 /** Mon–Sun of the week containing `ref`, with planner entries grouped per day. */

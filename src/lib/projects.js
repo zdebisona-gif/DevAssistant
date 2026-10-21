@@ -8,6 +8,7 @@
  */
 
 import { formatDateShort, toISODate } from './analytics.js'
+import { formatClock12 } from './format.js'
 
 export const DEFAULT_CREDITS = 100
 export const FORFEIT_CREDITS = 10
@@ -35,7 +36,7 @@ export function isOverdue(project, ref = new Date()) {
 }
 
 export function dueMeta(project, ref = new Date()) {
-  const time = project?.due_time ? ` · ${String(project.due_time).slice(0, 5)}` : ''
+  const time = project?.due_time ? ` · ${formatClock12(project.due_time)}` : ''
   return {
     label: `${formatDateShort(project?.due_date)}${time}`,
     overdue: isOverdue(project, ref),

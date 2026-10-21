@@ -57,7 +57,7 @@ export default function DateField({ label, value, onChange, hint }) {
           gap: 8,
         }}
       >
-        <Text style={{ fontFamily: fonts.sans, fontSize: text.body, color: value ? c.foreground : c.mutedForeground }}>
+        <Text style={{ fontFamily: fonts.mono, fontSize: text.body, color: value ? c.foreground : c.mutedForeground }}>
           {displayValue(value)}
         </Text>
         <CaretRight
@@ -122,7 +122,7 @@ export default function DateField({ label, value, onChange, hint }) {
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {cells.map((date, index) => {
-              if (!date) return <View key={`blank-${index}`} style={{ width: `${100 / 7}%`, height: 36 }} />
+              if (!date) return <View key={`blank-${index}`} style={{ width: `${100 / 7}%`, height: 44 }} />
               const iso = toISODate(date)
               const selected = iso === value
               const isToday = iso === today
@@ -135,7 +135,7 @@ export default function DateField({ label, value, onChange, hint }) {
                     onChange(iso)
                     setOpen(false)
                   }}
-                  style={{ width: `${100 / 7}%`, height: 36, alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: `${100 / 7}%`, height: 44, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <View
                     style={{

@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T13:50:09.6278350+08:00",
+  "title": "Design System: Zen-I Assistant",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#f8fafc",
+        "tonalRamp": ["#151a21", "#2a323d", "#47535f", "#6b7885", "#98a3ae", "#c5ccd4", "#e5e9ee", "#f8fafc"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#737373", "#a3a3a3", "#d1d1d1", "#ededed", "#ffffff"]
+      },
+      "surface-muted": {
+        "role": "neutral",
+        "displayName": "Muted Surface",
+        "canonical": "#e9eef6",
+        "tonalRamp": ["#1a2233", "#2e3a51", "#465573", "#66799b", "#93a3bd", "#bfcad9", "#dde4ee", "#e9eef6"]
+      },
+      "navy-ink": {
+        "role": "primary",
+        "displayName": "Navy Ink",
+        "canonical": "#1e40af",
+        "tonalRamp": ["#0b1a4d", "#122a6e", "#1a3a92", "#1e40af", "#3b63c9", "#6b8fdd", "#a9c0ee", "#dbe6fa"]
+      },
+      "navy-ink-deep": {
+        "role": "primary",
+        "displayName": "Deep Navy Ink",
+        "canonical": "#1e3a8a",
+        "tonalRamp": ["#081330", "#0e1f52", "#162c70", "#1e3a8a", "#3a5bb0", "#6a86cf", "#a7b9e7", "#dbe4fa"]
+      },
+      "slate-body": {
+        "role": "neutral",
+        "displayName": "Slate Body",
+        "canonical": "#334155",
+        "tonalRamp": ["#0d1117", "#1b2430", "#28374a", "#334155", "#55657a", "#8391a3", "#b5bfca", "#e2e8f0"]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#475569",
+        "tonalRamp": ["#121820", "#232d3b", "#364456", "#475569", "#6b7a8e", "#97a3b3", "#c3cbd5", "#e9eef6"]
+      },
+      "hairline-blue": {
+        "role": "neutral",
+        "displayName": "Blue Hairline",
+        "canonical": "#dbeafe",
+        "tonalRamp": ["#1b2740", "#2f4263", "#4c648c", "#7489ac", "#a0b2cc", "#c6d2e5", "#dbeafe", "#eff6ff"]
+      },
+      "hairline-slate": {
+        "role": "neutral",
+        "displayName": "Slate Hairline",
+        "canonical": "#e2e8f0",
+        "tonalRamp": ["#1a1f26", "#2e353f", "#48505c", "#656e7b", "#8b95a2", "#b4bcc7", "#d3dae2", "#e2e8f0"]
+      },
+      "navy-wash": {
+        "role": "primary",
+        "displayName": "Navy Wash",
+        "canonical": "#dbeafe",
+        "tonalRamp": ["#1b2740", "#2f4263", "#4c648c", "#7489ac", "#a0b2cc", "#c6d2e5", "#dbeafe", "#eff6ff"]
+      },
+      "amber-ember": {
+        "role": "secondary",
+        "displayName": "Amber Ember",
+        "canonical": "#d97706",
+        "tonalRamp": ["#3d2101", "#6b3a03", "#9a5305", "#d97706", "#f09a2e", "#f7ba6b", "#fbd7a6", "#fdeed8"]
+      },
+      "amber-ember-deep": {
+        "role": "secondary",
+        "displayName": "Deep Amber Ember",
+        "canonical": "#b45309",
+        "tonalRamp": ["#331802", "#592b04", "#8a4306", "#b45309", "#d4742a", "#e89d63", "#f4c7a2", "#fce8d8"]
+      },
+      "amber-wash": {
+        "role": "secondary",
+        "displayName": "Amber Wash",
+        "canonical": "#fef3c7",
+        "tonalRamp": ["#3a2a06", "#5c430a", "#82600f", "#a97e14", "#cfa42b", "#e9c25e", "#f7e0a1", "#fef3c7"]
+      },
+      "on-navy": {
+        "role": "neutral",
+        "displayName": "On Navy",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#737373", "#a3a3a3", "#d1d1d1", "#ededed", "#ffffff"]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Ledger Green",
+        "canonical": "#15803d",
+        "tonalRamp": ["#062b14", "#0b4a23", "#106b32", "#15803d", "#2aa557", "#63c98a", "#a7e3bd", "#dcfce7"]
+      },
+      "success-wash": {
+        "role": "semantic",
+        "displayName": "Ledger Green Wash",
+        "canonical": "#dcfce7",
+        "tonalRamp": ["#0f2418", "#1a3d2a", "#285c3f", "#3f7d58", "#6ba57f", "#9cc9ac", "#c8e6d4", "#dcfce7"]
+      },
+      "destructive": {
+        "role": "semantic",
+        "displayName": "Warning Red",
+        "canonical": "#dc2626",
+        "tonalRamp": ["#3f0a0a", "#6b1111", "#a11a1a", "#dc2626", "#ef5555", "#f58f8f", "#fac4c4", "#fee2e2"]
+      },
+      "destructive-wash": {
+        "role": "semantic",
+        "displayName": "Warning Red Wash",
+        "canonical": "#fee2e2",
+        "tonalRamp": ["#3a1414", "#5c2020", "#823030", "#a94a4a", "#c97a7a", "#e3a6a6", "#f4cccc", "#fee2e2"]
+      },
+      "destructive-text": {
+        "role": "semantic",
+        "displayName": "Warning Red Text",
+        "canonical": "#b91c1c",
+        "tonalRamp": ["#3f0a0a", "#6b1111", "#8f1919", "#b91c1c", "#d94343", "#e88585", "#f3bebe", "#fde8e8"]
+      },
+      "chart-spend": {
+        "role": "data",
+        "displayName": "Chart Spend",
+        "canonical": "#2563eb",
+        "tonalRamp": ["#0a1a4a", "#0f2b6e", "#17439b", "#2563eb", "#5c8bf2", "#93b4f7", "#c7d8fb", "#eaf1fe"]
+      },
+      "ripple-ink": {
+        "role": "interaction",
+        "displayName": "Ripple Ink",
+        "canonical": "rgba(15,23,42,0.04)",
+        "tonalRamp": ["rgba(15,23,42,0.02)", "rgba(15,23,42,0.06)", "rgba(15,23,42,0.12)", "rgba(15,23,42,0.20)", "rgba(15,23,42,0.32)", "rgba(15,23,42,0.48)", "rgba(15,23,42,0.64)", "rgba(15,23,42,0.80)"]
+      },
+      "scrim": {
+        "role": "interaction",
+        "displayName": "Sheet Scrim",
+        "canonical": "rgba(0,0,0,0.5)",
+        "tonalRamp": ["rgba(0,0,0,0.10)", "rgba(0,0,0,0.20)", "rgba(0,0,0,0.30)", "rgba(0,0,0,0.40)", "rgba(0,0,0,0.50)", "rgba(0,0,0,0.60)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.84)"]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Ledger Title",
+        "purpose": "Empty-state questions, hero figures and the sign-in title; Fira Code SemiBold."
+      },
+      "heading": {
+        "displayName": "Section Heading",
+        "purpose": "Section and card headings in Fira Sans SemiBold."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose, answers, list rows and inputs."
+      },
+      "label": {
+        "displayName": "Supporting Label",
+        "purpose": "Progress labels and supporting copy."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Hints, timestamps, metadata and field labels."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Overlines and IDs; uppercase micro carries 0.6 letter-spacing."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Button and chip labels at the default size."
+      },
+      "control-sm": {
+        "displayName": "Small Control",
+        "purpose": "Small button labels at 13px."
+      },
+      "figure": {
+        "displayName": "Tabular Figure",
+        "purpose": "Amounts, counts, percentages, dates and times in Fira Code with tabular numbers."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating",
+        "value": "0 6px 12px rgba(15,23,42,0.10) light / rgba(15,23,42,0.45) dark",
+        "purpose": "The single raised lift, reserved for the Ask action and genuinely floating surfaces."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fast",
+        "value": "140ms",
+        "purpose": "Press and opacity feedback."
+      },
+      {
+        "name": "base",
+        "value": "220ms",
+        "purpose": "Tab indicator and standard state transitions."
+      },
+      {
+        "name": "slow",
+        "value": "320ms",
+        "purpose": "Larger surface changes."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.22, 0, 0, 1)",
+        "purpose": "The only easing curve; used by the sliding tab indicator."
+      }
+    ],
+    "darkPalette": {
+      "paper": "#0b1220",
+      "surface": "#111a2e",
+      "surface-muted": "#1b2539",
+      "navy-ink": "#2563eb",
+      "navy-ink-deep": "#e6edfa",
+      "slate-body": "#c7d2e4",
+      "muted-ink": "#94a3b8",
+      "hairline-blue": "#24314a",
+      "hairline-slate": "#1f2b42",
+      "navy-wash": "#1b2e63",
+      "amber-ember": "#f59e0b",
+      "amber-ember-deep": "#fbbf24",
+      "amber-wash": "#3a2c0a",
+      "on-navy": "#ffffff",
+      "success": "#4ade80",
+      "success-wash": "#12291d",
+      "destructive": "#ef4444",
+      "destructive-wash": "#331515",
+      "destructive-text": "#fca5a5",
+      "chart-spend": "#60a5fa",
+      "ripple-ink": "rgba(255,255,255,0.08)",
+      "scrim": "rgba(0,0,0,0.6)"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single highest-emphasis action on a view.",
+      "html": "<button class='ds-btn-primary'>Add transaction</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:48px; min-width:48px; padding:0 18px; border:0; border-radius:999px; background:#1e40af; color:#ffffff; font-family:'Fira Sans',system-ui,sans-serif; font-weight:600; font-size:14px; line-height:1; cursor:pointer; transition:opacity 140ms cubic-bezier(0.22,0,0,1); } .ds-btn-primary:hover { opacity:.92; } .ds-btn-primary:active { opacity:.85; } .ds-btn-primary:focus-visible { outline:2px solid #1e40af; outline-offset:2px; } .ds-btn-primary:disabled { opacity:.5; cursor:not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default action: surface fill with a hairline border.",
+      "html": "<button class='ds-btn-secondary'>View all</button>",
+      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:48px; min-width:48px; padding:0 18px; border:1px solid #dbeafe; border-radius:999px; background:#ffffff; color:#1e3a8a; font-family:'Fira Sans',system-ui,sans-serif; font-weight:600; font-size:14px; line-height:1; cursor:pointer; transition:opacity 140ms cubic-bezier(0.22,0,0,1); } .ds-btn-secondary:hover { opacity:.92; } .ds-btn-secondary:active { opacity:.85; } .ds-btn-secondary:focus-visible { outline:2px solid #1e40af; outline-offset:2px; } .ds-btn-secondary:disabled { opacity:.5; cursor:not-allowed; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Reserved for irreversible actions such as delete.",
+      "html": "<button class='ds-btn-destructive'>Delete note</button>",
+      "css": ".ds-btn-destructive { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:48px; min-width:48px; padding:0 18px; border:0; border-radius:999px; background:#dc2626; color:#ffffff; font-family:'Fira Sans',system-ui,sans-serif; font-weight:600; font-size:14px; line-height:1; cursor:pointer; transition:opacity 140ms cubic-bezier(0.22,0,0,1); } .ds-btn-destructive:hover { opacity:.92; } .ds-btn-destructive:active { opacity:.85; } .ds-btn-destructive:focus-visible { outline:2px solid #1e40af; outline-offset:2px; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-active",
+      "description": "Pill selector used for filters and tags, shown selected and unselected.",
+      "html": "<div class='ds-chip-row'><button class='ds-chip is-active'>Food</button><button class='ds-chip'>Transport</button><button class='ds-chip'>Bills</button></div>",
+      "css": ".ds-chip-row { display:flex; flex-wrap:wrap; gap:8px; } .ds-chip { display:inline-flex; align-items:center; height:44px; padding:0 14px; border:1px solid #dbeafe; border-radius:999px; background:#ffffff; color:#475569; font-family:'Fira Sans',system-ui,sans-serif; font-weight:400; font-size:12px; cursor:pointer; transition:opacity 140ms cubic-bezier(0.22,0,0,1); } .ds-chip:hover { opacity:.9; } .ds-chip:focus-visible { outline:2px solid #1e40af; outline-offset:2px; } .ds-chip.is-active { background:#1e40af; border-color:#1e40af; color:#ffffff; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A grouped surface with a hairline border and no shadow.",
+      "html": "<section class='ds-card'><div class='ds-card-head'><div><h3 class='ds-card-title'>This month</h3><p class='ds-card-sub'>Income and spending</p></div><span class='ds-card-action'>View all</span></div><div class='ds-card-body'><p class='ds-card-copy'>Spent <span class='ds-card-figure'>₱12,480</span> across 24 transactions.</p></div></section>",
+      "css": ".ds-card { background:#ffffff; border:1px solid #dbeafe; border-radius:18px; overflow:hidden; max-width:360px; } .ds-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:16px 16px 12px; } .ds-card-title { margin:0; color:#1e3a8a; font-family:'Fira Sans',system-ui,sans-serif; font-weight:600; font-size:16px; } .ds-card-sub { margin:2px 0 0; color:#475569; font-family:'Fira Sans',system-ui,sans-serif; font-size:12px; } .ds-card-action { color:#1e40af; font-family:'Fira Sans',system-ui,sans-serif; font-weight:500; font-size:12px; white-space:nowrap; } .ds-card-body { padding:12px 16px 16px; } .ds-card-copy { margin:0; color:#334155; font-family:'Fira Sans',system-ui,sans-serif; font-size:14px; line-height:20px; } .ds-card-figure { color:#1e3a8a; font-family:'Fira Code',ui-monospace,monospace; font-weight:600; font-variant-numeric:tabular-nums; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Label above a paper-filled input with a hairline border.",
+      "html": "<label class='ds-field'><span class='ds-field-label'>Merchant</span><input class='ds-field-input' placeholder='e.g. Jollibee'/></label>",
+      "css": ".ds-field { display:flex; flex-direction:column; gap:6px; max-width:320px; } .ds-field-label { color:#475569; font-family:'Fira Sans',system-ui,sans-serif; font-weight:500; font-size:12px; } .ds-field-input { height:46px; padding:0 12px; border:1px solid #dbeafe; border-radius:14px; background:#f8fafc; color:#1e3a8a; font-family:'Fira Sans',system-ui,sans-serif; font-size:14px; outline:none; } .ds-field-input::placeholder { color:#475569; } .ds-field-input:focus { border-color:#1e40af; } .ds-field-input.is-invalid { border-color:#dc2626; } .ds-field-input:disabled { opacity:.5; cursor:not-allowed; } .ds-field-error { color:#b91c1c; font-family:'Fira Sans',system-ui,sans-serif; font-size:12px; }"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "description": "A quiet centred question in Fira Code with one line of guidance.",
+      "html": "<div class='ds-empty'><h3 class='ds-empty-title'>No notes yet</h3><p class='ds-empty-copy'>Capture a thought and it will wait here.</p></div>",
+      "css": ".ds-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:28px 24px; text-align:center; } .ds-empty-title { margin:0; color:#0b1220; font-family:'Fira Code',ui-monospace,monospace; font-weight:600; font-size:22px; line-height:28px; } .ds-empty-copy { margin:0; color:#475569; font-family:'Fira Sans',system-ui,sans-serif; font-size:12px; line-height:18px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Small pill for status, using the sanctioned semantic tones.",
+      "html": "<div class='ds-badge-row'><span class='ds-badge is-success'>Paid</span><span class='ds-badge is-accent'>85% used</span><span class='ds-badge is-danger'>Overdue</span></div>",
+      "css": ".ds-badge-row { display:flex; flex-wrap:wrap; gap:6px; } .ds-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-family:'Fira Sans',system-ui,sans-serif; font-weight:500; font-size:11px; } .ds-badge.is-success { background:#dcfce7; color:#15803d; } .ds-badge.is-accent { background:#fef3c7; color:#b45309; } .ds-badge.is-danger { background:#fee2e2; color:#dc2626; }"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "description": "Four destinations plus the raised Ask action in the reserved centre column.",
+      "html": "<nav class='ds-tabbar'><button class='ds-tab is-active'><svg viewBox='0 0 24 24' width='22' height='22' fill='none' stroke='currentColor' stroke-width='2'><path d='M3 10.5 12 3l9 7.5'/><path d='M5 9.5V21h14V9.5'/></svg><span class='ds-tab-label'>Home</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' width='22' height='22' fill='none' stroke='currentColor' stroke-width='2'><rect x='4' y='3' width='16' height='18' rx='2'/><path d='M8 3v18'/></svg><span class='ds-tab-label'>Notes</span></button><span class='ds-ask-slot'><button class='ds-ask' aria-label='Ask Zen-I'><svg viewBox='0 0 24 24' width='24' height='24' fill='currentColor'><path d='M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z'/><path d='M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z'/></svg></button></span><button class='ds-tab'><svg viewBox='0 0 24 24' width='22' height='22' fill='none' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='9'/><path d='M12 7v10'/><path d='M15 9.5c-.6-.8-1.6-1.2-3-1.2-1.7 0-3 .7-3 1.9 0 1.3 1.3 1.8 3 2.1 1.7.3 3 .8 3 2.1 0 1.2-1.3 1.9-3 1.9-1.4 0-2.4-.4-3-1.2'/></svg><span class='ds-tab-label'>Money</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' width='22' height='22' fill='none' stroke='currentColor' stroke-width='2'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M8 3v4M16 3v4M3 10h18'/></svg><span class='ds-tab-label'>Plan</span></button></nav>",
+      "css": ".ds-tabbar { position:relative; display:grid; grid-template-columns:repeat(5,1fr); align-items:center; width:360px; height:62px; padding:0 8px; background:#ffffff; border-top:1px solid #e2e8f0; font-family:'Fira Sans',system-ui,sans-serif; } .ds-tab { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; height:44px; margin:0 4px; border:0; border-radius:999px; background:transparent; color:#475569; cursor:pointer; } .ds-tab.is-active { background:#dbeafe; color:#1e3a8a; font-weight:600; } .ds-tab-label { font-size:10px; letter-spacing:.2px; line-height:1; } .ds-ask-slot { display:flex; align-items:flex-start; justify-content:center; height:62px; } .ds-ask { display:flex; align-items:center; justify-content:center; width:54px; height:54px; margin-top:-18px; border:0; border-radius:999px; background:#1e40af; color:#ffffff; box-shadow:0 6px 12px rgba(15,23,42,.10); cursor:pointer; } .ds-ask:active { transform:scale(.96); } .ds-ask:focus-visible { outline:2px solid #1e40af; outline-offset:2px; }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "description": "A borderless quiet metric: uppercase label, tabular figure and optional delta.",
+      "html": "<div class='ds-stat'><span class='ds-stat-label'>Spent this month</span><div class='ds-stat-line'><strong class='ds-stat-value'>₱12,480</strong><span class='ds-stat-delta is-good'>+4%</span></div></div>",
+      "css": ".ds-stat { display:flex; flex-direction:column; gap:4px; width:180px; font-family:'Fira Sans',system-ui,sans-serif; } .ds-stat-label { color:#475569; font-weight:600; font-size:11px; letter-spacing:.6px; text-transform:uppercase; } .ds-stat-line { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px; } .ds-stat-value { color:#1e3a8a; font-family:'Fira Code',ui-monospace,monospace; font-weight:600; font-size:22px; font-variant-numeric:tabular-nums; } .ds-stat-delta { font-weight:500; font-size:12px; font-variant-numeric:tabular-nums; } .ds-stat-delta.is-good { color:#15803d; } .ds-stat-delta.is-bad { color:#dc2626; }"
+    },
+    {
+      "name": "Account Card",
+      "kind": "custom",
+      "description": "The signature physical-feeling card with a per-kind gradient and monospace balance.",
+      "html": "<article class='ds-account'><div class='ds-account-top'><div class='ds-account-id'><span class='ds-account-name'>GCash</span><span class='ds-account-kind'>E-WALLET</span></div><span class='ds-account-menu'>⋯</span></div><div class='ds-account-bottom'><span class='ds-account-caption'>Balance</span><strong class='ds-account-balance'>₱8,420.50</strong><span class='ds-account-meta'>In this month · ₱5,000.00</span></div></article>",
+      "css": ".ds-account { position:relative; display:flex; flex-direction:column; justify-content:space-between; width:280px; height:172px; padding:16px; overflow:hidden; border-radius:18px; background:linear-gradient(135deg,#0b6fd0,#00a3ff); color:#ffffff; font-family:'Fira Sans',system-ui,sans-serif; } .ds-account::before { content:''; position:absolute; top:-56px; right:-32px; width:144px; height:144px; border-radius:50%; background:rgba(255,255,255,.10); } .ds-account::after { content:''; position:absolute; bottom:-96px; right:40px; width:192px; height:192px; border-radius:50%; background:rgba(255,255,255,.07); } .ds-account-top, .ds-account-bottom { position:relative; z-index:1; } .ds-account-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; } .ds-account-id { display:flex; flex-direction:column; gap:6px; } .ds-account-name { font-weight:600; font-size:15px; } .ds-account-kind { align-self:flex-start; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.18); font-family:'Fira Code',ui-monospace,monospace; font-size:11px; letter-spacing:.4px; } .ds-account-menu { display:flex; align-items:center; justify-content:center; width: 36px; height: 36px; border-radius:999px; background:rgba(255,255,255,.16); font-weight:700; } .ds-account-bottom { display:flex; flex-direction:column; gap:2px; } .ds-account-caption { color:rgba(255,255,255,.72); font-weight:500; font-size:11px; letter-spacing:.6px; text-transform:uppercase; } .ds-account-balance { font-family:'Fira Code',ui-monospace,monospace; font-weight:600; font-size:26px; font-variant-numeric:tabular-nums; } .ds-account-meta { color:rgba(255,255,255,.82); font-family:'Fira Code',ui-monospace,monospace; font-size:11px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lantern Ledger",
+    "overview": "Zen-I looks like a ledger kept at night: navy ink for the records and their structure, one warm amber lamp for the thing that needs attention. Every screen is a page in the same book, so the switch between money, notes, plans and study should feel like turning a page, not changing apps.\n\nThe app runs in Operate mode. Scanability, consistency and Android expectations outrank expression. Density is comfortable rather than airy, surfaces are paper-flat with hairline rules, and every figure is set in Fira Code so numbers read like ledger entries. Expression lives in precision: monospace screen titles, a single ember signal, and the physical gradient account cards.\n\nLight and dark are peer schemes, not an inversion. Motion is brief and functional (140/220/320ms), selection carries a haptic tick, and the Android Back gesture and safe areas are always honored. Android is the design authority; Material supplies the structure and the brand lives in the theme.",
+    "keyCharacteristics": [
+      "Navy Ink structure with a single Amber Ember signal.",
+      "Fira Sans for prose; Fira Code for figures and screen titles.",
+      "Flat, hairline-bordered surfaces; one rare raised lift.",
+      "4pt rhythm, 16px gutters, 48dp targets.",
+      "Light and dark share one semantic token set.",
+      "Android-first, portrait, safe-area aware."
+    ],
+    "rules": [
+      {
+        "name": "The One Ember Rule",
+        "body": "Amber is a signal, not decoration. It appears where the user must look — a budget nearing its limit, the income comparison, a single accent badge — and stays rare everywhere else.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaningful Color Rule",
+        "body": "Navy means \"act or selected\"; success and destructive mean a real delta or error. Never use status colors as ornament.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Ink Chart Rule",
+        "body": "Charts use exactly two data inks: Chart Spend for values and Amber Ember for the comparison line. No third hue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Truth Rule",
+        "body": "If it is a number, it is tabular. The default face is Fira Code; the only exception is the small StatCard delta, which keeps tabular figures in Fira Sans Medium.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Title Rule",
+        "body": "Screen titles and empty-state questions use Fira Code SemiBold; section headings use Fira Sans SemiBold. This contrast is the signature — do not flatten it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two-Family Rule",
+        "body": "Fira Sans and Fira Code only. No third family, no display serif, no icon font.",
+        "section": "typography"
+      },
+      {
+        "name": "The 4pt Rule",
+        "body": "Spacing comes from xs–xxl (4/8/12/16/24/32). No arbitrary gaps.",
+        "section": "layout"
+      },
+      {
+        "name": "The 16px Gutter Rule",
+        "body": "Screen edges are 16, not 12 or 20. Cards and sheets inherit that gutter internally.",
+        "section": "layout"
+      },
+      {
+        "name": "The 48dp Target Rule",
+        "body": "Anything tappable is at least 48dp tall; icon-only controls get hit slop to reach it.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline-or-Shadow Rule",
+        "body": "A surface gets a hairline border or a shadow, never both.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Lift Rule",
+        "body": "One raised element per screen. On the dashboard that is the Ask action; do not add competing floating cards.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Pill-for-Actions Rule",
+        "body": "If it can be pressed, tagged or selected, it is a pill. A rectangular button is off-system.",
+        "section": "shapes"
+      },
+      {
+        "name": "The 10px Floor Rule",
+        "body": "No radius below 10. Sharp corners do not exist in this system.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do pull every color, space, radius, font and motion value from src/theme/tokens.js through useTheme().",
+      "Do set every number in tabular figures, defaulting to Fira Code.",
+      "Do use the 4pt scale and 16px screen gutters.",
+      "Do use pill shapes for buttons, chips, badges and selection indicators.",
+      "Do pair a hairline border with flat surfaces; reserve the single shadow for the Ask action.",
+      "Do keep amber rare and meaningful.",
+      "Do preserve 48dp touch targets, safe-area insets and Android Back behavior.",
+      "Do design light and dark together and verify both."
+    ],
+    "donts": [
+      "Don't hardcode hex values in screens; use the semantic palette.",
+      "Don't set figures in Fira Sans (except the sanctioned StatCard delta) or add a third font family.",
+      "Don't put shadows on cards, sections or list rows.",
+      "Don't use success, destructive or amber as decoration.",
+      "Don't wrap plain sections in cards.",
+      "Don't introduce sharp corners or radii below 10.",
+      "Don't copy iOS controls, bottom-only navigation or Cupertino dialogs; theme Material structure instead.",
+      "Don't add tablet breakpoints or layouts that are not defined."
+    ]
+  }
+}

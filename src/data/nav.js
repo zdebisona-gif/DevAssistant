@@ -9,7 +9,7 @@ import {
 /*
  * Bottom navigation: four destinations plus one raised action.
  * Order here must match the order the navigator registers its screens.
- * Projects is not a tab; it opens from the Dashboard "At a glance" row.
+ * Projects is not a tab; it opens from the Dashboard "More" row.
  */
 export const TAB_ITEMS = [
   { route: 'index', path: '/', label: 'Home', icon: House },

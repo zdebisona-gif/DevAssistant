@@ -29,9 +29,9 @@ function VerdictCard({ result }) {
         {passed ? (
           <Check size={15} weight="bold" color={c.success} />
         ) : (
-          <WarningCircle size={15} weight="bold" color={c.destructive} />
+          <WarningCircle size={15} weight="bold" color={c.destructiveText} />
         )}
-        <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.body, color: passed ? c.success : c.destructive }}>
+        <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.body, color: passed ? c.success : c.destructiveText }}>
           {passed ? 'Passed' : 'Failed'}
           {typeof result.score === 'number' ? ` · ${result.score}/100` : ''}
         </Text>
@@ -66,6 +66,7 @@ export default function SubmissionSheet({ visible, project, onClose }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWriteUp('')
     setLink('')
     setResult(null)
@@ -172,7 +173,7 @@ export default function SubmissionSheet({ visible, project, onClose }) {
       />
 
       {error ? (
-        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructiveText }}>{error}</Text>
       ) : null}
 
       {!result ? (

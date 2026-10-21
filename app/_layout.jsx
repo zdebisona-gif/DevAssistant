@@ -65,6 +65,7 @@ function RootStack() {
           <Stack.Screen name="course/[id]" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="projects" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="sleep" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
         </Stack.Protected>
       </Stack>

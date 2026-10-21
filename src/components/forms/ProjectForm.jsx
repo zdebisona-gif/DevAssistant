@@ -24,6 +24,7 @@ export default function ProjectForm({ visible, onClose, record }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(record?.title ?? '')
     setBrief(record?.brief ?? '')
     setCriteria(record?.criteria ?? '')

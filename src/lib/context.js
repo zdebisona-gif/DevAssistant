@@ -18,8 +18,9 @@ import {
   upcomingEntries,
   weekHours,
 } from './analytics.js'
-import { money } from './format.js'
+import { money, moneyAbs } from './format.js'
 import { accountRows, debtTotals, openDebts } from './accounts.js'
+import { financeScore } from './finance.js'
 import { coursesTree } from './learning.js'
 import { creditBalance, dueMeta, openPenalties, sortProjects } from './projects.js'
 
@@ -48,14 +49,19 @@ export function buildFinanceContext(data, options = {}) {
   if (rows.length) {
     const totalLimit = rows.reduce((sum, row) => sum + row.limit, 0)
     const totalSpent = rows.reduce((sum, row) => sum + row.spent, 0)
-    lines.push(`Budgets: ${money(totalLimit, 0)} total, ${money(totalSpent, 0)} used, ${money(totalLimit - totalSpent, 0)} remaining.`)
+    const remaining = totalLimit - totalSpent
+    lines.push(
+      `Budgets: ${money(totalLimit, 0)} total, ${money(totalSpent, 0)} used, ${
+        remaining < 0 ? `${moneyAbs(remaining, 0)} over` : `${money(remaining, 0)} remaining`
+      }.`,
+    )
   } else {
     lines.push('No monthly budgets are set.')
   }
 
   const accounts = accountRows(data)
   if (accounts.length) {
-    if (options.hidden) {
+    if (options.hidden || options.accountsHidden) {
       lines.push(`The user has ${accounts.length} tracked accounts, but their balances are hidden right now.`)
     } else {
       lines.push('Accounts (opening balance plus spending tagged to each):')
@@ -95,6 +101,13 @@ export function buildFinanceContext(data, options = {}) {
     }
   } else {
     lines.push('No spending logged this month.')
+  }
+
+  const weeklyScore = financeScore(data)
+  if (weeklyScore.score !== null) {
+    lines.push(
+      `Weekly finance score: ${weeklyScore.score}/100 (${weeklyScore.label}), rolling four weeks.`,
+    )
   }
 
   return { context: lines.join('\n'), sources: ['Finances'] }

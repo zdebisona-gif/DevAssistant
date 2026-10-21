@@ -1,11 +1,12 @@
 import { Pressable, Text, View } from 'react-native'
 import { Check } from '../../icons.js'
 import { formatDateShort } from '../../lib/analytics.js'
+import { formatClock12 } from '../../lib/format.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 function metaFor(item) {
   const date = formatDateShort(item.date)
-  const time = item.time ? String(item.time).slice(0, 5) : null
+  const time = item.time ? formatClock12(item.time) : null
   return [date, time, item.tag].filter(Boolean).join(' · ')
 }
 

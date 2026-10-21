@@ -25,6 +25,7 @@ export default function BudgetForm({ visible, onClose, record }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCategory(record?.category ?? MONEY_CATEGORIES[0])
     setLimit(record ? String(Number(record.limit_amount) || '') : '')
     setError(null)

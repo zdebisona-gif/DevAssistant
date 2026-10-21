@@ -20,8 +20,9 @@ export default function EmptyState({ icon: Icon, title, description, action, sty
       <View style={{ alignItems: 'center', gap: 4 }}>
         <Text
           style={{
-            fontFamily: fonts.sansSemiBold,
-            fontSize: text.body,
+            fontFamily: fonts.monoSemiBold,
+            fontSize: text.title,
+            lineHeight: 28,
             color: c.foreground,
             textAlign: 'center',
           }}

@@ -19,6 +19,7 @@ export default function NoteView({ note, onClose, onEdit, onDelete }) {
   const subtitle = note?.tag ? `${note.tag} · ${stamp}` : stamp
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSummary(null)
     setBusy(false)
   }, [note?.id])

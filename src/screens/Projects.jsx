@@ -13,7 +13,7 @@ import Loading from '../components/ui/Loading.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import { useData } from '../data/store.jsx'
-import { confirmDelete } from '../lib/alerts.js'
+import { confirmDelete, reportError } from '../lib/alerts.js'
 import {
   FORFEIT_CREDITS,
   creditBalance,
@@ -116,7 +116,7 @@ export default function Projects() {
           label: 'Delete',
           icon: Trash,
           destructive: true,
-          onPress: () => confirmDelete(project.title, () => deleteProject(project.id).catch(() => {})),
+          onPress: () => confirmDelete(project.title, () => deleteProject(project.id).catch(reportError)),
         },
       ],
     })
@@ -176,7 +176,7 @@ export default function Projects() {
             padding: 12,
           }}
         >
-          <WarningCircle size={16} weight="bold" color={c.destructive} />
+          <WarningCircle size={16} weight="bold" color={c.destructiveText} />
           <Text style={{ flex: 1, fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.body }}>
             New projects are locked. Write an atonement in the ledger below to unlock them.
           </Text>
@@ -234,7 +234,7 @@ export default function Projects() {
                       style={{
                         fontFamily: fonts.sansMedium,
                         fontSize: text.micro,
-                        color: meta.overdue ? c.destructive : c.mutedForeground,
+                        color: meta.overdue ? c.destructiveText : c.mutedForeground,
                       }}
                     >
                       {dueLine(project)}
@@ -340,7 +340,7 @@ export default function Projects() {
                   >
                     {penalty.project_title}
                   </Text>
-                  <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.micro, color: c.destructive }}>
+                  <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.micro, color: c.destructiveText }}>
                     {reasonLabel(penalty.reason)} · −{Number(penalty.credits) || 0} credits
                   </Text>
                   {penalty.atoned ? (

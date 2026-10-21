@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "paths": {
+      "phosphor-react-native": ["./node_modules/phosphor-react-native/lib/typescript/index.d.ts"],
+      "phosphor-react-native/src/icons/*": ["./node_modules/phosphor-react-native/lib/typescript/icons/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "supabase/functions", "babel.config.js", "metro.config.js"]
+}

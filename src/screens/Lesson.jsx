@@ -18,7 +18,7 @@ import Section from '../components/layout/Section.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useAiPrefs } from '../data/aiPrefs.jsx'
 import { useData } from '../data/store.jsx'
-import { confirmDelete } from '../lib/alerts.js'
+import { confirmDelete, reportError } from '../lib/alerts.js'
 import { relativeTime } from '../lib/analytics.js'
 import { describeGeminiError, generateLesson, inCooldown } from '../lib/gemini.js'
 import { courseProgress, lessonContext, locateLesson } from '../lib/learning.js'
@@ -46,7 +46,10 @@ export default function Lesson() {
   const located = locateLesson(id, data)
   const lessonId = located?.lesson.id
   const touchRef = useRef(touchLesson)
-  touchRef.current = touchLesson
+
+  useEffect(() => {
+    touchRef.current = touchLesson
+  })
 
   useEffect(() => {
     if (lessonId) touchRef.current(lessonId)
@@ -104,7 +107,7 @@ export default function Lesson() {
           key: 'toggle',
           label: lesson.done ? 'Mark incomplete' : 'Mark complete',
           icon: Check,
-          onPress: () => toggleLesson(lesson.id, !lesson.done).catch(() => {}),
+          onPress: () => toggleLesson(lesson.id, !lesson.done).catch(reportError),
         },
         { key: 'edit', label: 'Edit lesson', icon: PencilSimple, onPress: () => setEditOpen(true) },
         {
@@ -115,7 +118,7 @@ export default function Lesson() {
           onPress: () =>
             confirmDelete(lesson.title, () => {
               router.back()
-              deleteLesson(lesson.id).catch(() => {})
+              deleteLesson(lesson.id).catch(reportError)
             }),
         },
       ],
@@ -207,7 +210,7 @@ export default function Lesson() {
           />
         )}
         {writeError ? (
-          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>
+          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructiveText }}>
             {writeError}
           </Text>
         ) : null}
@@ -241,7 +244,7 @@ export default function Lesson() {
         <Button
           variant={lesson.done ? 'secondary' : 'primary'}
           icon={lesson.done ? Check : undefined}
-          onPress={() => toggleLesson(lesson.id, !lesson.done).catch(() => {})}
+          onPress={() => toggleLesson(lesson.id, !lesson.done).catch(reportError)}
           style={{ flex: 1 }}
         >
           {lesson.done ? 'Completed' : 'Mark complete'}
@@ -356,7 +359,7 @@ export default function Lesson() {
           const note = viewing
           confirmDelete(note.title, () => {
             setViewing(null)
-            deleteNote(note.id).catch(() => {})
+            deleteNote(note.id).catch(reportError)
           })
         }}
       />

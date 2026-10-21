@@ -18,6 +18,7 @@ export default function AtonementSheet({ visible, penalty, onClose }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNote('')
     setSaving(false)
     setError(null)

@@ -164,7 +164,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
         accessibilityRole="button"
         onPress={() => setTableOpen((open) => !open)}
         hitSlop={8}
-        style={{ marginTop: 12 }}
+        style={{ marginTop: 12, minHeight: 44, justifyContent: 'center' }}
       >
         <Text style={{ fontFamily: fonts.sansMedium, fontSize: 12, color: c.primaryFg }}>
           {tableOpen ? 'Hide data table' : 'View data table'}

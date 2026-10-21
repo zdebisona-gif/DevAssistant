@@ -10,7 +10,7 @@ const FocusContext = createContext(null)
  */
 export function FocusProvider({ children }) {
   const [session, setSession] = useState(null)
-  const [tick, setTick] = useState(Date.now())
+  const [tick, setTick] = useState(() => Date.now())
   const [ready, setReady] = useState(false)
 
   useEffect(() => {

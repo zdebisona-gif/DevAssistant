@@ -11,7 +11,10 @@ export default function RowMenuButton({ onPress, accessibilityLabel = 'More opti
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
+      onPress={(event) => {
+        event.stopPropagation()
+        onPress()
+      }}
       hitSlop={8}
       style={({ pressed }) => ({
         width: size,

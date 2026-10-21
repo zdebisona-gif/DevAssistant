@@ -34,6 +34,7 @@ export default function TxForm({ visible, onClose, record }) {
   useEffect(() => {
     if (!visible) return
     const signed = Number(record?.amount ?? 0)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setKind(signed > 0 ? 'Income' : 'Expense')
     setMerchant(record?.merchant ?? '')
     setAmount(record ? String(Math.abs(signed)) : '')

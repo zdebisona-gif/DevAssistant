@@ -11,6 +11,7 @@ export function IconButton({ icon: Icon, onPress, accessibilityLabel, style }) {
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
+      hitSlop={2}
       android_ripple={{ color: c.overline, borderless: true }}
       style={({ pressed }) => [
         {

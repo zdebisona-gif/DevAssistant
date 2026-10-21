@@ -19,6 +19,7 @@ export default function CourseForm({ visible, onClose, record }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(record?.name ?? '')
     setDescription(record?.description ?? '')
     setWeekly(record && Number(record.weekly_target_hours) > 0 ? String(Number(record.weekly_target_hours)) : '')

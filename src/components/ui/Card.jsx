@@ -45,7 +45,7 @@ export function CardHeader({ title, subtitle, action, style }) {
       ]}
     >
       <View style={{ flexShrink: 1, gap: 2 }}>
-        <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.body, color: c.foreground }}>
+        <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.heading, color: c.foreground }}>
           {title}
         </Text>
         {subtitle ? (

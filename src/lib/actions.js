@@ -13,7 +13,7 @@
 import { budgetsForMonth, formatDateShort, toISODate, todayISO } from './analytics.js'
 import { accountsFor, accountBalance, openDebts } from './accounts.js'
 import { MONEY_CATEGORIES, NOTE_TAGS, PLAN_TAGS } from '../data/constants.js'
-import { money } from './format.js'
+import { money, moneyAbs, formatClock12 } from './format.js'
 import { courseLessons } from './learning.js'
 import {
   isISODate,
@@ -452,8 +452,8 @@ function buildDeleteTransaction(args, data) {
   const row = found.row
   return ok('delete_transaction', 'local', {
     target: { id: row.id, label: row.merchant },
-    summary: `Delete the ${row.merchant} transaction (${money(row.amount)})`,
-    details: [{ label: 'Transaction', value: `${row.merchant} · ${money(row.amount)}` }],
+    summary: `Delete the ${row.merchant} transaction (${moneyAbs(row.amount)})`,
+    details: [{ label: 'Transaction', value: `${row.merchant} · ${moneyAbs(row.amount)}` }],
     destructive: true,
   })
 }
@@ -511,11 +511,11 @@ function buildCreatePlanEntry(args) {
   const payload = checked.payload
   return ok('create_planner_event', 'local', {
     payload,
-    summary: `Add “${payload.title}” to ${formatDateShort(payload.entry_date)}${payload.start_time ? ` at ${payload.start_time.slice(0, 5)}` : ''}`,
+    summary: `Add “${payload.title}” to ${formatDateShort(payload.entry_date)}${payload.start_time ? ` at ${formatClock12(payload.start_time)}` : ''}`,
     details: [
       { label: 'Title', value: payload.title },
       { label: 'Date', value: formatDateShort(payload.entry_date) },
-      { label: 'Time', value: payload.start_time ? payload.start_time.slice(0, 5) : 'None' },
+      { label: 'Time', value: payload.start_time ? formatClock12(payload.start_time) : 'None' },
       { label: 'Tag', value: payload.tag },
     ],
   })
@@ -540,7 +540,12 @@ function buildUpdatePlanEntry(args, data) {
     summary: `Update the “${row.title}” plan entry`,
     details: Object.entries(patch).map(([key, value]) => ({
       label: fieldLabel(key),
-      value: value === null || value === undefined ? 'None' : String(value),
+      value:
+        value === null || value === undefined
+          ? 'None'
+          : key === 'start_time'
+            ? formatClock12(value)
+            : String(value),
     })),
   })
 }
@@ -711,7 +716,7 @@ function buildCreateProject(args) {
       { label: 'Brief', value: payload.brief },
       {
         label: 'Deadline',
-        value: `${formatDateShort(payload.due_date)}${payload.due_time ? ` ${payload.due_time.slice(0, 5)}` : ''}`,
+        value: `${formatDateShort(payload.due_date)}${payload.due_time ? ` ${formatClock12(payload.due_time)}` : ''}`,
       },
       ...(payload.criteria ? [{ label: 'Passes when', value: payload.criteria }] : []),
     ],

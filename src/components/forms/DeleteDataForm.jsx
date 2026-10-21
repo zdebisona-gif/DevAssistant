@@ -23,6 +23,7 @@ export default function DeleteDataForm({ visible, onClose }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConfirm('')
     setError(null)
     setSaving(false)
@@ -61,12 +62,13 @@ export default function DeleteDataForm({ visible, onClose }) {
           backgroundColor: c.destructiveSoft,
         }}
       >
-        <WarningCircle size={16} weight="bold" color={c.destructive} />
+        <WarningCircle size={16} weight="bold" color={c.destructiveText} />
         <Text
-          style={{ flex: 1, fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.destructive }}
+          style={{ flex: 1, fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.destructiveText }}
         >
-          Permanently removes every note, transaction, budget, account, debt, plan entry, course,
-          lesson, study session and project in this account. Your sign-in and app settings stay.
+          Permanently removes every note, transaction, budget, account, debt, plan entry, task,
+          sleep log, course, lesson, study session and project in this account. Your sign-in and
+          app settings stay.
         </Text>
       </View>
 
@@ -86,7 +88,7 @@ export default function DeleteDataForm({ visible, onClose }) {
       {error ? (
         <Text
           accessibilityLiveRegion="polite"
-          style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.destructive }}
+          style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.destructiveText }}
         >
           {error}
         </Text>

@@ -23,6 +23,7 @@ export default function LessonTutor({ visible, course, module, lesson, onClose }
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuestion('')
     setEntries([])
     setAsking(false)

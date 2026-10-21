@@ -25,6 +25,9 @@ const EMPTY = {
   penalties: [],
   accounts: [],
   debts: [],
+  tasks: [],
+  sleepLogs: [],
+  sleepCreditEvents: [],
 }
 
 const DataContext = createContext(null)
@@ -53,6 +56,7 @@ export function DataProvider({ children }) {
   }, [uid])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     reload()
   }, [reload])
@@ -170,6 +174,16 @@ export function DataProvider({ children }) {
         mutate(() =>
           db.updateDebt(id, { settled, settled_at: settled ? new Date().toISOString() : null }),
         ),
+      createTask: (row) => mutate(() => db.addTask(row)),
+      updateTask: (id, patch) => mutate(() => db.updateTask(id, patch)),
+      deleteTask: (id) => mutate(() => db.deleteTask(id)),
+      toggleTask: (id, done) =>
+        mutate(() =>
+          db.updateTask(id, { done, completed_at: done ? new Date().toISOString() : null }),
+        ),
+      createSleepLog: (row) => mutate(() => db.addSleepLog(row)),
+      updateSleepLog: (id, patch) => mutate(() => db.updateSleepLog(id, patch)),
+      deleteSleepLog: (id) => mutate(() => db.deleteSleepLog(id)),
       createPenalty: (row) => mutate(() => db.addPenalty(row)),
       /* Irreversible: removes every record for this account, then reloads to empty. */
       deleteAllData: () => mutate(() => db.deleteAllData()),
@@ -187,7 +201,7 @@ export function DataProvider({ children }) {
           })
         }),
     }),
-    [data, loading, error, reload, mutate],
+    [data, loading, error, reload, mutate, uid],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

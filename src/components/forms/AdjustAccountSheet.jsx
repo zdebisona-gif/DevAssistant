@@ -21,7 +21,8 @@ const MODE_KEY = { 'Add money': 'add', 'Take out': 'subtract', 'Set balance': 's
 
 export default function AdjustAccountSheet({ visible, account, mode = 'add', onClose }) {
   const { c, fonts, text } = useTheme()
-  const { hidden } = usePrivacy()
+  const { hidden, accountsHidden } = usePrivacy()
+  const accountHidden = hidden || accountsHidden
   const { adjustOpeningBalance, reconcileAccount } = useData()
   const [choice, setChoice] = useState('Add money')
   const [amount, setAmount] = useState('')
@@ -30,6 +31,7 @@ export default function AdjustAccountSheet({ visible, account, mode = 'add', onC
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setChoice(MODES.find((label) => MODE_KEY[label] === mode) ?? 'Add money')
     setAmount('')
     setError(null)
@@ -59,7 +61,7 @@ export default function AdjustAccountSheet({ visible, account, mode = 'add', onC
       visible={visible}
       onClose={onClose}
       title={account?.name ?? 'Adjust balance'}
-      subtitle={`Current balance ${moneyOr(account?.balance ?? 0, hidden, 2)}`}
+      subtitle={`Current balance ${moneyOr(account?.balance ?? 0, accountHidden, 2)}`}
     >
       <TagPicker label="Action" options={MODES} value={choice} onChange={setChoice} />
       <Field
@@ -75,7 +77,7 @@ export default function AdjustAccountSheet({ visible, account, mode = 'add', onC
             : 'A manual adjustment — it is not logged as income or spending.'
         }
       />
-      {hidden ? (
+      {accountHidden ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}>
           Balances are hidden on screen; this update still applies.
         </Text>

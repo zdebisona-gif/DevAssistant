@@ -8,7 +8,7 @@
  * lesson progress. Never notes, transactions or account data.
  */
 
-import { courseTree, coursesTree } from './learning.js'
+import { coursesTree } from './learning.js'
 import {
   courseWeekHours,
   startOfWeek,

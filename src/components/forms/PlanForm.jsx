@@ -25,6 +25,7 @@ export default function PlanForm({ visible, onClose, date: initialDate, record, 
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTitle(record?.title ?? '')
     setDate(record?.entry_date ?? initialDate ?? todayISO())
     setTime(record?.start_time ? String(record.start_time).slice(0, 5) : '')

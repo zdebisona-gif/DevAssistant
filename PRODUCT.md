@@ -69,6 +69,11 @@ not truthfully copy this cross-record grounding.
   account, so usage cannot incur charges. Settings shows the remaining requests for the day.
 - A note can be summarized with Gemini only when Zane explicitly taps "Summarize with Gemini" in
   the note viewer; the chatbot never sends note bodies on its own.
+- A note can also be drafted with Gemini from a typed topic, either from the Notes header or by
+  saying "make me a note about..." in Ask Zen-I. Only the topic is sent - no records or personal
+  context. The returned title, body and tag open in the normal note editor for review, and nothing
+  is saved until Zane confirms. Drafts about current procedures or other time-sensitive facts are
+  prompted to stay general where uncertain and point to the official source.
 - Ask Zen-I can also act: commands like "I paid 100 in jollibee using my cash", "bought groceries 250
   with bdo", "grab 220", "juan owes me 500", "settle the juan debt" or "add 500 to gcash" are parsed
   (on-device first, Gemini fallback when AI is on) into a single whitelisted action — log or change a
@@ -121,6 +126,11 @@ not truthfully copy this cross-record grounding.
   Zane, or Zane owes them), an optional note and due date, then settle or delete — no partial
   payments, no interest, no net-worth maths (`public.debts`). They live on the Money screen only,
   with settled rows collapsed; Ask Zen-I can log and settle them.
+- Money shows a weekly finance score: a 0-100 rolling four-week check-in built from savings rate
+  (30), budget adherence (30), debt pressure (20) and cash buffer (20). It is derived live and
+  never stored. The Money card breaks down all four components and an eight-week trend; Dashboard
+  shows a compact version. When AI is on, an optional Gemini explanation uses only the score
+  aggregates - never individual transactions, merchant names or hidden balances.
 - A per-device "Hide balances" switch (Money header and Settings) masks account balances, the total
   in accounts, per-card income and debt amounts as ₱•••••• — for over-the-shoulder viewing, not
   security. Spending, budgets and transaction amounts stay visible. While it is on, the hidden

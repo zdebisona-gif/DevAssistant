@@ -5,6 +5,7 @@
  */
 
 import { todayISO } from './analytics.js'
+import { sessionMinutes } from './sleep.js'
 import { ACCOUNT_KINDS, DEBT_DIRECTIONS } from '../data/constants.js'
 
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -126,6 +127,64 @@ export function validatePlanEntry(input) {
       entry_date: date,
       start_time: normalizeTime(input?.time ?? input?.start_time),
       tag: input?.tag || 'Daily',
+    },
+  }
+}
+
+export function validateTask(input) {
+  const title = String(input?.title ?? '').trim()
+  if (!title) return { ok: false, error: 'Add a task.' }
+  const due = input?.due_date
+  if (due && !isISODate(due)) return { ok: false, error: 'Use a valid due date.' }
+  return {
+    ok: true,
+    payload: {
+      title,
+      tag: input?.tag || 'Daily',
+      due_date: due || null,
+    },
+  }
+}
+
+export function validateSleepNote(input) {
+  const text = String(input ?? '').trim()
+  if (!text) return { ok: false, error: 'Add a note first.' }
+  if (text.length > 1000) return { ok: false, error: 'Keep each sleep note under 1000 characters.' }
+  return { ok: true, payload: { text } }
+}
+
+export function validateSleepLog(input) {
+  const date = input?.log_date || todayISO()
+  if (!isISODate(date)) return { ok: false, error: 'Use a valid sleep date.' }
+  if (date > todayISO()) return { ok: false, error: 'Sleep date cannot be in the future.' }
+
+  const rawSessions = Array.isArray(input?.sessions) ? input.sessions : []
+  if (!rawSessions.length) return { ok: false, error: 'Add at least one sleep session.' }
+  if (rawSessions.length > 6) return { ok: false, error: 'Keep it to six sleep sessions per day.' }
+
+  const sessions = []
+  let totalMinutes = 0
+  for (const session of rawSessions) {
+    const from = normalizeTime(session?.from)
+    const to = normalizeTime(session?.to)
+    if (!from || !to) return { ok: false, error: 'Set both sleep times for each session.' }
+    if (from === to) return { ok: false, error: 'A sleep session needs different start and end times.' }
+
+    const minutes = sessionMinutes({ from, to })
+    if (!minutes) return { ok: false, error: 'That sleep session has no duration.' }
+    totalMinutes += minutes
+    sessions.push({ from, to })
+  }
+
+  if (totalMinutes > 24 * 60) {
+    return { ok: false, error: 'Total sleep for one day cannot exceed 24 hours.' }
+  }
+
+  return {
+    ok: true,
+    payload: {
+      log_date: date,
+      sessions,
     },
   }
 }

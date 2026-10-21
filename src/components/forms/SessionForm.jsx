@@ -23,6 +23,7 @@ export default function SessionForm({ visible, onClose, record, defaults }) {
 
   useEffect(() => {
     if (!visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDate(record?.studied_on ?? todayISO())
     setHours(record ? String(Number(record.hours) || '') : defaults?.hours != null ? String(defaults.hours) : '')
     setCourseId(record?.course_id ?? defaults?.courseId ?? null)
