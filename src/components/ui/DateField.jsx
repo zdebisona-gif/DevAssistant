@@ -17,7 +17,7 @@ function displayValue(value) {
   return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function DateField({ label, value, onChange, hint }) {
+export default function DateField({ label, value, onChange, hint, minDate }) {
   const { c, fonts, radius, text } = useTheme()
   const [open, setOpen] = useState(false)
   const seed = value ? new Date(`${value}T00:00:00`) : new Date()
@@ -33,6 +33,14 @@ export default function DateField({ label, value, onChange, hint }) {
     return list
   }, [view])
 
+  const weeks = useMemo(() => {
+    const rows = []
+    for (let index = 0; index < cells.length; index += 7) {
+      rows.push(cells.slice(index, index + 7))
+    }
+    return rows
+  }, [cells])
+
   const today = todayISO()
 
   return (
@@ -43,9 +51,10 @@ export default function DateField({ label, value, onChange, hint }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${displayValue(value)}`}
+        accessibilityState={{ expanded: open }}
         onPress={() => setOpen((prev) => !prev)}
-        style={{
-          minHeight: 46,
+        style={({ pressed }) => ({
+          minHeight: 48,
           borderRadius: radius.md,
           borderWidth: 1,
           borderColor: open ? c.primary : c.border,
@@ -55,9 +64,18 @@ export default function DateField({ label, value, onChange, hint }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 8,
-        }}
+          opacity: pressed ? 0.75 : 1,
+        })}
       >
-        <Text style={{ fontFamily: fonts.mono, fontSize: text.body, color: value ? c.foreground : c.mutedForeground }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            flexShrink: 1,
+            fontFamily: fonts.mono,
+            fontSize: text.body,
+            color: value ? c.foreground : c.mutedForeground,
+          }}
+        >
           {displayValue(value)}
         </Text>
         <CaretRight
@@ -85,11 +103,26 @@ export default function DateField({ label, value, onChange, hint }) {
               accessibilityLabel="Previous month"
               hitSlop={8}
               onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}
-              style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+              style={({ pressed }) => ({
+                width: 32,
+                height: 32,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
               <CaretLeft size={16} weight="bold" color={c.foreground} />
             </Pressable>
-            <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.caption, color: c.foreground }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                flexShrink: 1,
+                textAlign: 'center',
+                fontFamily: fonts.sansSemiBold,
+                fontSize: text.caption,
+                color: c.foreground,
+              }}
+            >
               {monthTitle(view)}
             </Text>
             <Pressable
@@ -97,7 +130,13 @@ export default function DateField({ label, value, onChange, hint }) {
               accessibilityLabel="Next month"
               hitSlop={8}
               onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}
-              style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+              style={({ pressed }) => ({
+                width: 32,
+                height: 32,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
               <CaretRight size={16} weight="bold" color={c.foreground} />
             </Pressable>
@@ -120,50 +159,69 @@ export default function DateField({ label, value, onChange, hint }) {
             ))}
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {cells.map((date, index) => {
-              if (!date) return <View key={`blank-${index}`} style={{ width: `${100 / 7}%`, height: 44 }} />
-              const iso = toISODate(date)
-              const selected = iso === value
-              const isToday = iso === today
-              return (
-                <Pressable
-                  key={iso}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    onChange(iso)
-                    setOpen(false)
-                  }}
-                  style={{ width: `${100 / 7}%`, height: 44, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <View
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 999,
+          {weeks.map((week, weekIndex) => (
+            <View key={`week-${weekIndex}`} style={{ flexDirection: 'row' }}>
+              {week.map((date, index) => {
+                if (!date) {
+                  return <View key={`blank-${weekIndex}-${index}`} style={{ flex: 1, height: 48 }} />
+                }
+
+                const iso = toISODate(date)
+                const selected = iso === value
+                const isToday = iso === today
+                const disabled = Boolean(minDate) && iso < minDate
+                return (
+                  <Pressable
+                    key={iso}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${date.toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}${isToday ? ', today' : ''}${disabled ? ', unavailable' : ''}`}
+                    accessibilityState={{ selected, disabled }}
+                    disabled={disabled}
+                    onPress={() => {
+                      onChange(iso)
+                      setOpen(false)
+                    }}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      height: 48,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: selected ? c.primary : 'transparent',
-                      borderWidth: !selected && isToday ? 1 : 0,
-                      borderColor: c.primary,
-                    }}
+                      opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
+                    })}
                   >
-                    <Text
+                    <View
                       style={{
-                        fontFamily: selected ? fonts.monoSemiBold : fonts.mono,
-                        fontSize: text.caption,
-                        color: selected ? c.onPrimary : c.foreground,
-                        fontVariant: ['tabular-nums'],
+                        width: 36,
+                        height: 36,
+                        borderRadius: 999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: selected ? c.primary : 'transparent',
+                        borderWidth: !selected && isToday ? 1 : 0,
+                        borderColor: c.primary,
                       }}
                     >
-                      {date.getDate()}
-                    </Text>
-                  </View>
-                </Pressable>
-              )
-            })}
-          </View>
+                      <Text
+                        style={{
+                          fontFamily: selected ? fonts.monoSemiBold : fonts.mono,
+                          fontSize: text.caption,
+                          color: selected ? c.onPrimary : c.foreground,
+                          fontVariant: ['tabular-nums'],
+                        }}
+                      >
+                        {date.getDate()}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )
+              })}
+            </View>
+          ))}
         </View>
       ) : null}
 

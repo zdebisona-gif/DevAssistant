@@ -10,7 +10,6 @@ const FocusContext = createContext(null)
  */
 export function FocusProvider({ children }) {
   const [session, setSession] = useState(null)
-  const [tick, setTick] = useState(() => Date.now())
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -27,15 +26,8 @@ export function FocusProvider({ children }) {
       .finally(() => setReady(true))
   }, [])
 
-  useEffect(() => {
-    if (!session) return undefined
-    const id = setInterval(() => setTick(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [session])
-
   const persist = useCallback((next) => {
     setSession(next)
-    setTick(Date.now())
     if (next) AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {})
     else AsyncStorage.removeItem(KEY).catch(() => {})
   }, [])
@@ -62,12 +54,11 @@ export function FocusProvider({ children }) {
       ready,
       session,
       active: Boolean(session),
-      elapsedMs: session ? tick - session.startedAt : 0,
       start,
       stop,
       cancel,
     }),
-    [ready, session, tick, start, stop, cancel],
+    [ready, session, start, stop, cancel],
   )
 
   return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>

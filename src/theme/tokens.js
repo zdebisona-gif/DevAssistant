@@ -123,6 +123,15 @@ export const accountGradients = {
   other: ['#1e3a8a', '#2563eb'],
 }
 
+export const accountColorGradients = {
+  ocean: ['#075985', '#0ea5e9'],
+  forest: ['#14532d', '#22c55e'],
+  sunset: ['#9a3412', '#f97316'],
+  rose: ['#9f1239', '#f43f5e'],
+  violet: ['#5b21b6', '#a855f7'],
+  graphite: ['#1f2937', '#64748b'],
+}
+
 /* A single, quiet elevation level — used sparingly for raised or floating surfaces. */
 export function shadow(palette) {
   return {

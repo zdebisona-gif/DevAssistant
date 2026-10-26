@@ -6,7 +6,7 @@
 
 import { todayISO } from './analytics.js'
 import { sessionMinutes } from './sleep.js'
-import { ACCOUNT_KINDS, DEBT_DIRECTIONS } from '../data/constants.js'
+import { ACCOUNT_COLORS, ACCOUNT_KINDS, DEBT_DIRECTIONS } from '../data/constants.js'
 
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export const CLOCK = /^\d{1,2}:\d{2}$/
@@ -15,16 +15,28 @@ export function isISODate(value) {
   return typeof value === 'string' && ISO_DATE.test(value)
 }
 
+/** A finite number from loose input ("₱1,000", "PHP 200"), or null. */
+function toNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  const cleaned = String(value ?? '')
+    .replace(/[₱$€£]/g, ' ')
+    .replace(/\b(?:php|pesos?)\b/gi, ' ')
+    .replace(/,/g, '')
+    .trim()
+  const match = cleaned.match(/-?\d+(?:\.\d+)?/)
+  return match ? Number.parseFloat(match[0]) : null
+}
+
 /** A finite number greater than zero, or null. */
 export function parsePositive(value) {
-  const n = Number.parseFloat(value)
-  return Number.isFinite(n) && n > 0 ? n : null
+  const n = toNumber(value)
+  return n !== null && n > 0 ? n : null
 }
 
 /** A non-negative number (zero allowed), or null. */
 export function parseNonNegative(value) {
-  const n = Number.parseFloat(value)
-  return Number.isFinite(n) && n >= 0 ? n : null
+  const n = toNumber(value)
+  return n !== null && n >= 0 ? n : null
 }
 
 export function parseCount(value) {
@@ -51,6 +63,7 @@ export function validateNote(input) {
       title,
       body: String(input?.body ?? '').trim(),
       tag: input?.tag || 'Personal',
+      important: Boolean(input?.important),
       course_id: input?.course_id || null,
       lesson_id: input?.lesson_id || null,
     },
@@ -92,7 +105,8 @@ export function validateAccount(input) {
   const kind = ACCOUNT_KINDS.includes(input?.kind) ? input.kind : 'other'
   const opening = parseNonNegative(input?.opening_balance ?? 0)
   if (opening === null) return { ok: false, error: 'Opening balance cannot be negative.' }
-  return { ok: true, payload: { name, kind, opening_balance: opening } }
+  const color = ACCOUNT_COLORS.includes(input?.color) && input.color !== 'default' ? input.color : null
+  return { ok: true, payload: { name, kind, opening_balance: opening, color } }
 }
 
 export function validateDebt(input) {
@@ -115,11 +129,12 @@ export function validateDebt(input) {
   }
 }
 
-export function validatePlanEntry(input) {
+export function validatePlanEntry(input, { allowPast = false } = {}) {
   const title = String(input?.title ?? '').trim()
   if (!title) return { ok: false, error: 'Add a title.' }
   const date = input?.entry_date || todayISO()
   if (!isISODate(date)) return { ok: false, error: 'Use a valid date.' }
+  if (!allowPast && date < todayISO()) return { ok: false, error: 'Pick today or a later date.' }
   return {
     ok: true,
     payload: {
@@ -127,21 +142,27 @@ export function validatePlanEntry(input) {
       entry_date: date,
       start_time: normalizeTime(input?.time ?? input?.start_time),
       tag: input?.tag || 'Daily',
+      priority: Boolean(input?.priority),
     },
   }
 }
 
-export function validateTask(input) {
+export function validateTask(input, { allowPast = false } = {}) {
   const title = String(input?.title ?? '').trim()
   if (!title) return { ok: false, error: 'Add a task.' }
   const due = input?.due_date
   if (due && !isISODate(due)) return { ok: false, error: 'Use a valid due date.' }
+  if (due && !allowPast && due < todayISO()) {
+    return { ok: false, error: 'Pick today or a later due date.' }
+  }
   return {
     ok: true,
     payload: {
       title,
       tag: input?.tag || 'Daily',
       due_date: due || null,
+      due_time: due ? normalizeTime(input?.due_time ?? input?.time) : null,
+      priority: Boolean(input?.priority),
     },
   }
 }

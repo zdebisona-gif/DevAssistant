@@ -23,6 +23,18 @@ export const ACCOUNT_KIND_LABELS = {
   other: 'Other',
 }
 
+export const ACCOUNT_COLORS = ['default', 'ocean', 'forest', 'sunset', 'rose', 'violet', 'graphite']
+
+export const ACCOUNT_COLOR_LABELS = {
+  default: 'Default',
+  ocean: 'Ocean',
+  forest: 'Forest',
+  sunset: 'Sunset',
+  rose: 'Rose',
+  violet: 'Violet',
+  graphite: 'Graphite',
+}
+
 export const DEBT_DIRECTIONS = ['owed_to_me', 'i_owe']
 
 export const DEBT_DIRECTION_LABELS = {

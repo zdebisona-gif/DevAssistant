@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { Check, Sparkle, WarningCircle } from '../../icons.js'
 import Button from '../ui/Button.jsx'
+import Chip from '../ui/Chip.jsx'
+import FadeSwap from '../ui/FadeSwap.jsx'
 import { ACTION_LABELS } from '../../lib/actions.js'
+import { MONEY_CATEGORIES } from '../../data/constants.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 /* A proposal card: nothing is written until the user confirms. */
@@ -11,6 +15,11 @@ export default function ActionConfirm({ proposal, state = 'idle', error, onConfi
   const busy = state === 'running'
   const done = state === 'done'
   const cancelled = state === 'cancelled'
+  const [picked, setPicked] = useState(null)
+  const needsCategory =
+    proposal.action === 'create_transaction' &&
+    (proposal.needsCategory || !proposal.payload?.category)
+  const askCategory = needsCategory && !done && !cancelled
 
   return (
     <View
@@ -63,7 +72,7 @@ export default function ActionConfirm({ proposal, state = 'idle', error, onConfi
 
       <View style={{ gap: 4 }}>
         <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.label, color: c.foreground }}>
-          {ACTION_LABELS[proposal.action] || 'Change record'}
+          {proposal.label || ACTION_LABELS[proposal.action] || 'Change record'}
         </Text>
         <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 20, color: c.body }}>
           {proposal.summary}
@@ -102,6 +111,36 @@ export default function ActionConfirm({ proposal, state = 'idle', error, onConfi
         </View>
       ) : null}
 
+      {askCategory ? (
+        <View
+          style={{
+            gap: 8,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: c.accent,
+            borderRadius: radius.md,
+            backgroundColor: c.accentSoft,
+            padding: 12,
+          }}
+        >
+          <Text
+            accessibilityRole="header"
+            style={{ fontFamily: fonts.sansSemiBold, fontSize: text.label, color: c.accentText }}
+          >
+            Category needed
+          </Text>
+          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.body }}>
+            Zen-I couldn&apos;t determine the category for this transaction. Pick one to continue.
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {MONEY_CATEGORIES.map((option) => (
+              <Chip key={option} active={picked === option} onPress={() => setPicked(option)}>
+                {option}
+              </Chip>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {proposal.destructive ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <WarningCircle size={14} weight="bold" color={c.destructive} />
@@ -117,27 +156,41 @@ export default function ActionConfirm({ proposal, state = 'idle', error, onConfi
         </Text>
       ) : null}
 
-      {done ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Check size={14} weight="bold" color={c.accent} />
-          <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.body }}>
-            Done — the record is saved.
+      <FadeSwap swapKey={done ? 'done' : cancelled ? 'cancelled' : 'actions'}>
+        {done ? (
+          <View
+            accessibilityLiveRegion="polite"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Check size={14} weight="bold" color={c.accent} />
+            <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.body }}>
+              Done. The record is saved.
+            </Text>
+          </View>
+        ) : cancelled ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}
+          >
+            Cancelled. Nothing changed.
           </Text>
-        </View>
-      ) : cancelled ? (
-        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-          Cancelled — nothing changed.
-        </Text>
-      ) : (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button variant="secondary" onPress={onCancel} disabled={busy} style={{ flex: 1 }}>
-            Cancel
-          </Button>
-          <Button variant="primary" onPress={onConfirm} loading={busy} style={{ flex: 1 }}>
-            Confirm
-          </Button>
-        </View>
-      )}
+        ) : (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button variant="secondary" onPress={onCancel} disabled={busy} style={{ flex: 1 }}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onPress={() => onConfirm(needsCategory ? picked : undefined)}
+              loading={busy}
+              disabled={needsCategory && !picked}
+              style={{ flex: 1 }}
+            >
+              Confirm
+            </Button>
+          </View>
+        )}
+      </FadeSwap>
     </View>
   )
 }

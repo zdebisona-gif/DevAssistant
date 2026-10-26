@@ -8,14 +8,13 @@ export default function Chip({ children, onPress, active = false }) {
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      android_ripple={{ color: c.overline }}
       style={({ pressed }) => ({
         borderRadius: radius.pill,
         borderWidth: 1,
         borderColor: active ? c.primary : c.border,
         backgroundColor: active ? c.primary : c.card,
         paddingHorizontal: 14,
-        minHeight: 44,
+        minHeight: 48,
         justifyContent: 'center',
         paddingVertical: 8,
         opacity: pressed ? 0.85 : 1,

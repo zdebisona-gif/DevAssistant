@@ -10,7 +10,9 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from '../../icons.js'
+import { useReducedMotion } from '../../lib/useReducedMotion.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
+import IconButton from './IconButton.jsx'
 
 /*
  * A bottom sheet for short, focused forms. Slides over the screen, traps taps
@@ -19,6 +21,7 @@ import { useTheme } from '../../theme/ThemeProvider.jsx'
 export default function Sheet({ visible, onClose, title, subtitle, children }) {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
+  const reduced = useReducedMotion()
   const { height: windowHeight } = useWindowDimensions()
   const maxListHeight = Math.max(200, Math.round(windowHeight * 0.88 - insets.bottom - 150))
 
@@ -26,7 +29,7 @@ export default function Sheet({ visible, onClose, title, subtitle, children }) {
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reduced ? 'fade' : 'slide'}
       statusBarTranslucent
       onRequestClose={onClose}
     >
@@ -40,6 +43,8 @@ export default function Sheet({ visible, onClose, title, subtitle, children }) {
           style={{ flex: 1, backgroundColor: c.scrim }}
         />
         <View
+          accessibilityViewIsModal
+          importantForAccessibility="yes"
           style={{
             backgroundColor: c.card,
             borderTopLeftRadius: radius.lg,
@@ -75,20 +80,22 @@ export default function Sheet({ visible, onClose, title, subtitle, children }) {
                 </Text>
               ) : null}
             </View>
-            <Pressable
-              accessibilityRole="button"
+            <IconButton
+              icon={X}
+              size={36}
+              iconSize={18}
+              tone="mutedForeground"
               accessibilityLabel="Close"
               onPress={onClose}
               hitSlop={10}
-              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <X size={18} weight="bold" color={c.mutedForeground} />
-            </Pressable>
+              ripple={false}
+            />
           </View>
 
           <ScrollView
             style={{ flexGrow: 0, maxHeight: maxListHeight }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, gap: 16 }}
           >
             {children}

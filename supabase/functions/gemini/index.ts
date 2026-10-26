@@ -144,7 +144,8 @@ const ACTION_RULES = [
   'Spending is often phrased loosely: "I paid 100 in jollibee using my cash", "bought groceries 250 with bdo", "grab 220", "coffee 50". Treat the amount as args.amount, the shop or service as args.merchant, and the funding source after using/with/via/from/in (for example "my cash") as args.account. Keep args.account even when it is not in the saved list, and still keep it out of args.merchant.',
   'Words like salary, sweldo, allowance or "got paid" mean type "income"; everything else is "expense". If no merchant is clear, use the category name or "Expense".',
   'For adjust_account put the account name in args.account, the amount in args.amount, and args.operation "add" (money in), "subtract" (money out) or "set" (make the balance exactly this).',
-  'For add_debt put the other person in args.counterparty, the amount in args.amount, args.direction "owed_to_me" when they owe the user or "i_owe" when the user owes them, and any deadline in args.due. For settle_debt and delete_debt put the person in args.counterparty.',
+  'For add_debt put the other person in args.counterparty, the amount in args.amount, args.direction "owed_to_me" when they owe the user or "i_owe" when the user owes them, and any deadline in args.due.',
+  'When the user says they paid, repaid, returned or settled money owed to or by someone, use settle_debt, never create_transaction. Put the other person in args.counterparty, the payment amount in args.amount, the saved account name in args.account, and args.direction "owed_to_me" when they paid the user or "i_owe" when the user paid them. If the amount, account or direction is missing, return settle_debt with only the details the user gave; the app asks for the rest. For delete_debt put the person in args.counterparty.',
 ].join(' ')
 
 const NOTE_TAGS = ['Work', 'Study', 'Idea', 'Personal'] as const

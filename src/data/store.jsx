@@ -9,7 +9,8 @@
 import { AppState } from 'react-native'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as db from '../lib/db.js'
-import { taggedNet } from '../lib/accounts.js'
+import { roundMoney, settlementFor, taggedNet } from '../lib/accounts.js'
+import { money } from '../lib/format.js'
 import { useAuth } from './auth.jsx'
 
 const EMPTY = {
@@ -28,6 +29,7 @@ const EMPTY = {
   tasks: [],
   sleepLogs: [],
   sleepCreditEvents: [],
+  goals: [],
 }
 
 const DataContext = createContext(null)
@@ -37,10 +39,12 @@ export function DataProvider({ children }) {
   const [data, setData] = useState(EMPTY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [loadedFor, setLoadedFor] = useState(null)
 
   const reload = useCallback(async () => {
     if (!uid) {
       setData(EMPTY)
+      setLoadedFor(null)
       setError(null)
       setLoading(false)
       return
@@ -48,6 +52,7 @@ export function DataProvider({ children }) {
     setError(null)
     try {
       setData(await db.loadAll())
+      setLoadedFor(uid)
     } catch (cause) {
       setError(cause)
     } finally {
@@ -83,6 +88,7 @@ export function DataProvider({ children }) {
       data,
       loading,
       error,
+      loadedFor,
       reload,
       createNote: (row) => mutate(() => db.addNote(row)),
       updateNote: (id, patch) => mutate(() => db.updateNote(id, patch)),
@@ -174,6 +180,31 @@ export function DataProvider({ children }) {
         mutate(() =>
           db.updateDebt(id, { settled, settled_at: settled ? new Date().toISOString() : null }),
         ),
+      /* A real payment moves the account balance but is deliberately not a transaction,
+         so debt settlement never inflates income or spending totals. */
+      recordDebtSettlement: (id, payment) => {
+        const debt = data.debts.find((row) => row.id === id)
+        if (!debt) throw new Error('That debt no longer exists.')
+        const account = data.accounts.find((row) => row.id === payment?.account_id)
+        if (!account) throw new Error('Choose a saved account for this payment.')
+        const result = settlementFor(debt, payment?.amount)
+        if (!result.ok) {
+          if (result.code === 'overpay') {
+            throw new Error(`That is more than the ${money(result.outstanding)} remaining.`)
+          }
+          if (result.code === 'closed') throw new Error('That debt is already settled.')
+          throw new Error('Enter a payment greater than zero.')
+        }
+        const nextOpening = roundMoney((Number(account.opening_balance) || 0) + result.delta)
+        return mutate(async () => {
+          await db.updateDebt(id, {
+            amount: result.settled ? roundMoney(debt.amount) : result.remaining,
+            settled: result.settled,
+            settled_at: result.settled ? new Date().toISOString() : null,
+          })
+          await db.updateAccount(account.id, { opening_balance: nextOpening })
+        })
+      },
       createTask: (row) => mutate(() => db.addTask(row)),
       updateTask: (id, patch) => mutate(() => db.updateTask(id, patch)),
       deleteTask: (id) => mutate(() => db.deleteTask(id)),
@@ -184,6 +215,9 @@ export function DataProvider({ children }) {
       createSleepLog: (row) => mutate(() => db.addSleepLog(row)),
       updateSleepLog: (id, patch) => mutate(() => db.updateSleepLog(id, patch)),
       deleteSleepLog: (id) => mutate(() => db.deleteSleepLog(id)),
+      createGoal: (row) => mutate(() => db.addGoal(row)),
+      updateGoal: (id, patch) => mutate(() => db.updateGoal(id, patch)),
+      deleteGoal: (id) => mutate(() => db.deleteGoal(id)),
       createPenalty: (row) => mutate(() => db.addPenalty(row)),
       /* Irreversible: removes every record for this account, then reloads to empty. */
       deleteAllData: () => mutate(() => db.deleteAllData()),
@@ -201,7 +235,7 @@ export function DataProvider({ children }) {
           })
         }),
     }),
-    [data, loading, error, reload, mutate, uid],
+    [data, loading, error, loadedFor, reload, mutate, uid],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

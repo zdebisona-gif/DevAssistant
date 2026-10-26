@@ -1,8 +1,11 @@
 import { useLocalSearchParams } from 'expo-router'
-import { PaperPlaneRight, Sparkle } from '../icons.js'
+import { CaretDown, PaperPlaneRight, Sparkle } from '../icons.js'
 import { useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   Animated,
+  Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +16,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useReducedMotion } from '../lib/useReducedMotion.js'
 import Screen from '../components/layout/Screen.jsx'
 import ActionConfirm from '../components/assistant/ActionConfirm.jsx'
 import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
@@ -21,12 +25,13 @@ import Chip from '../components/ui/Chip.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import Loading from '../components/ui/Loading.jsx'
 import ProgressBar from '../components/ui/ProgressBar.jsx'
+import Reveal from '../components/ui/Reveal.jsx'
 import NoteForm from '../components/forms/NoteForm.jsx'
 import { useData } from '../data/store.jsx'
 import { useAiPrefs } from '../data/aiPrefs.jsx'
 import { usePrivacy } from '../data/privacy.jsx'
 import { answerQuery, deriveSuggestions } from '../lib/ask.js'
-import { buildActionContext, buildExtractedProposal, looksLikeCommand, parseLocalAction, runAction } from '../lib/actions.js'
+import { buildActionContext, buildExtractedProposal, looksLikeCommand, parseLocalAction, runAction, withCategory } from '../lib/actions.js'
 import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
 import { buildContextFor } from '../lib/context.js'
 import { askGemini, describeGeminiError, extractAction, generateNote, inCooldown } from '../lib/gemini.js'
@@ -40,13 +45,47 @@ function fallbackNote(error) {
 }
 
 function AssistantMessage({ message, onFollowUp }) {
-  const { c, fonts, radius, text } = useTheme()
+  const { c, fonts, motion, radius, text } = useTheme()
+  const reduced = useReducedMotion()
+  const [mark] = useState(() => new Animated.Value(0))
   const { answer, breakdown, insight, followUps, label } = message
   const isAi = Boolean(label?.startsWith('AI'))
+
+  useEffect(() => {
+    if (reduced) {
+      mark.setValue(1)
+      return undefined
+    }
+
+    mark.setValue(0)
+    const animation = Animated.timing(mark, {
+      toValue: 1,
+      duration: motion.fast,
+      easing: Easing.bezier(0.22, 0, 0, 1),
+      useNativeDriver: true,
+    })
+    animation.start()
+    return () => animation.stop()
+  }, [mark, motion.fast, reduced])
+
   return (
     <View style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Sparkle size={16} weight="duotone" color={c.primaryFg} />
+        <Animated.View
+          style={{
+            opacity: mark,
+            transform: [
+              {
+                scale: mark.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.84, 1],
+                }),
+              },
+            ],
+          }}
+        >
+          <Sparkle size={16} weight="duotone" color={c.primaryFg} />
+        </Animated.View>
         <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.caption, color: c.foreground }}>
           Zen-I
         </Text>
@@ -73,7 +112,10 @@ function AssistantMessage({ message, onFollowUp }) {
           </View>
         ) : null}
       </View>
-      <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 21, color: c.body }}>
+      <Text
+        accessibilityLiveRegion="polite"
+        style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 21, color: c.body }}
+      >
         {answer}
       </Text>
 
@@ -266,7 +308,8 @@ function NoteErrorCard({ message, onRetry, canRetry }) {
 }
 
 function ThinkingBubble() {
-  const { c } = useTheme()
+  const { c, fonts, radius, text } = useTheme()
+  const reduced = useReducedMotion()
   const [dots] = useState(() => [
     new Animated.Value(0.35),
     new Animated.Value(0.35),
@@ -274,6 +317,11 @@ function ThinkingBubble() {
   ])
 
   useEffect(() => {
+    if (reduced) {
+      dots.forEach((dot) => dot.setValue(0.6))
+      return undefined
+    }
+
     const animations = dots.map((dot, index) =>
       Animated.loop(
         Animated.sequence([
@@ -285,23 +333,145 @@ function ThinkingBubble() {
     )
     animations.forEach((animation) => animation.start())
     return () => animations.forEach((animation) => animation.stop())
-  }, [dots])
+  }, [dots, reduced])
+
+  const mark = (
+    <View
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: radius.pill,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: c.primarySoft,
+      }}
+    >
+      <Sparkle size={15} weight="fill" color={c.primary} />
+    </View>
+  )
+
+  if (reduced) {
+    return (
+      <View
+        accessible
+        accessibilityLabel="Zen-I is checking your records"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+      >
+        {mark}
+        <View style={{ gap: 2 }}>
+          <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.micro, color: c.foreground }}>
+            Zen-I
+          </Text>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}
+          >
+            Checking your records…
+          </Text>
+        </View>
+      </View>
+    )
+  }
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-      {dots.map((dot, index) => (
-        <Animated.View
-          key={index}
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 999,
-            backgroundColor: c.mutedForeground,
-            opacity: dot,
-          }}
-        />
-      ))}
+    <View
+      accessible
+      accessibilityLabel="Zen-I is checking your records"
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+    >
+      {mark}
+      <View style={{ gap: 3 }}>
+        <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.micro, color: c.foreground }}>
+          Zen-I
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+            Checking your records
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {dots.map((dot, index) => (
+              <Animated.View
+                key={index}
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 999,
+                  backgroundColor: c.mutedForeground,
+                  opacity: dot,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
     </View>
+  )
+}
+
+function NewReplyPill({ visible, onPress }) {
+  const { c, fonts, motion, radius, text } = useTheme()
+  const reduced = useReducedMotion()
+  const [progress] = useState(() => new Animated.Value(0))
+
+  useEffect(() => {
+    if (reduced) {
+      progress.setValue(visible ? 1 : 0)
+      return undefined
+    }
+
+    const animation = Animated.timing(progress, {
+      toValue: visible ? 1 : 0,
+      duration: visible ? motion.base : motion.fast,
+      easing: Easing.bezier(0.22, 0, 0, 1),
+      useNativeDriver: true,
+    })
+    animation.start()
+    return () => animation.stop()
+  }, [motion.base, motion.fast, progress, reduced, visible])
+
+  return (
+    <Animated.View
+      pointerEvents={visible ? 'auto' : 'none'}
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+      style={{
+        position: 'absolute',
+        bottom: 12,
+        alignSelf: 'center',
+        opacity: progress,
+        transform: [
+          {
+            translateY: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [8, 0],
+            }),
+          },
+        ],
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Jump to the latest reply"
+        onPress={onPress}
+        style={({ pressed }) => ({
+          minHeight: 48,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingHorizontal: 14,
+          borderRadius: radius.pill,
+          borderWidth: 1,
+          borderColor: c.border,
+          backgroundColor: c.card,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.foreground }}>
+          New reply
+        </Text>
+        <CaretDown size={14} weight="bold" color={c.mutedForeground} />
+      </Pressable>
+    </Animated.View>
   )
 }
 
@@ -322,13 +492,55 @@ export default function AskAI() {
   const [noteDraft, setNoteDraft] = useState(null)
   const [noteDraftMessageId, setNoteDraftMessageId] = useState(null)
   const [noteFormOpen, setNoteFormOpen] = useState(false)
+  const [newReply, setNewReply] = useState(false)
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
   const scrollRef = useRef(null)
   const handled = useRef(null)
+  const atBottom = useRef(true)
+  const reduced = useReducedMotion()
 
   const suggestions = deriveSuggestions(data)
 
+  const scrollToLatest = (animated = true) => {
+    scrollRef.current?.scrollToEnd({ animated: animated && !reduced })
+    atBottom.current = true
+    setNewReply(false)
+  }
+
+  const clearConversation = () => {
+    if (!messages.length) return
+    Alert.alert(
+      'Clear conversation?',
+      'This removes the messages on this screen. Your records stay untouched.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            setMessages([])
+            setNewReply(false)
+            atBottom.current = true
+          },
+        },
+      ],
+    )
+  }
+
   useEffect(() => {
     loadAskHistory().then(setHistory)
+  }, [])
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true)
+      if (atBottom.current) scrollRef.current?.scrollToEnd({ animated: false })
+    })
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
   }, [])
 
   const updateMessage = (id, patch) =>
@@ -362,6 +574,8 @@ export default function AskAI() {
     setMessages((prev) => [...prev, { id: `u${stamp}`, role: 'user', text: value }])
     setInput('')
     setPending(true)
+    atBottom.current = true
+    setNewReply(false)
     pushAskHistory(value, history).then(setHistory)
 
     const notePrompt = extractNotePrompt(value)
@@ -473,12 +687,19 @@ export default function AskAI() {
     setPending(false)
   }
 
-  const confirmAction = async (id) => {
+  const confirmAction = async (id, category) => {
     const message = messages.find((entry) => entry.id === id)
     if (!message?.proposal) return
+    let proposal = message.proposal
+    /* A category picked in the confirmation card is part of the proposal before the
+       write happens; the unresolved proposal itself is never saved. */
+    if (category) {
+      proposal = withCategory(proposal, category)
+      updateMessage(id, { proposal })
+    }
     updateMessage(id, { actionState: 'running', actionError: null })
     try {
-      await runAction(services, message.proposal)
+      await runAction(services, proposal)
       updateMessage(id, { actionState: 'done', actionError: null })
     } catch (error) {
       updateMessage(id, {
@@ -510,7 +731,19 @@ export default function AskAI() {
       title="Ask Zen-I"
       right={
         messages.length ? (
-          <Pressable accessibilityRole="button" onPress={() => setMessages([])} hitSlop={16}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear conversation"
+            onPress={clearConversation}
+            hitSlop={4}
+            style={({ pressed }) => ({
+              minHeight: 48,
+              minWidth: 48,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
             <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.mutedForeground }}>
               Clear
             </Text>
@@ -529,111 +762,136 @@ export default function AskAI() {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={{ padding: 16, gap: 20, flexGrow: 1, paddingBottom: 24 }}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={{ padding: 16, gap: 20, flexGrow: 1, paddingBottom: 24 }}
+            onContentSizeChange={() => {
+              if (atBottom.current) scrollToLatest(false)
+              else setNewReply(true)
+            }}
+            onScroll={({ nativeEvent }) => {
+              const distance =
+                nativeEvent.contentSize.height -
+                (nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height)
+              const nearBottom = distance < 80
+              atBottom.current = nearBottom
+              if (nearBottom) setNewReply(false)
+            }}
+            scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+          >
           {empty ? (
             <View style={{ gap: 16, paddingTop: 8 }}>
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.title, color: c.foreground }}>
-                  What should we look at?
-                </Text>
-                <Text style={{ fontFamily: fonts.sans, fontSize: text.label, lineHeight: 20, color: c.mutedForeground }}>
-                  Ask about a period, a category or a goal &mdash; or just tell me what you spent, like
-                  &ldquo;I paid 100 in jollibee using my cash&rdquo;, &ldquo;grab 220&rdquo; or &ldquo;earned 5000&rdquo;. I&rsquo;ll log it
-                  for you to confirm. You can also say &ldquo;make me a note about SSS&rdquo;.
-                </Text>
-              </View>
+              <Reveal distance={4}>
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.title, color: c.foreground }}>
+                    What should we look at?
+                  </Text>
+                  <Text style={{ fontFamily: fonts.sans, fontSize: text.label, lineHeight: 20, color: c.mutedForeground }}>
+                    Ask about a period, category or goal. You can also say &ldquo;grab 220&rdquo; or
+                    &ldquo;make me a note about SSS&rdquo; and I&rsquo;ll prepare it for you to confirm.
+                  </Text>
+                </View>
+              </Reveal>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {suggestions.map((suggestion) => (
-                  <Chip key={suggestion} onPress={() => ask(suggestion)}>
-                    {suggestion}
-                  </Chip>
+                {suggestions.map((suggestion, index) => (
+                  <Reveal key={suggestion} distance={4} delay={40 + index * 30}>
+                    <Chip onPress={() => ask(suggestion)}>{suggestion}</Chip>
+                  </Reveal>
                 ))}
               </View>
               {history.length ? (
-                <View style={{ gap: 8 }}>
-                  <Text
-                    style={{
-                      fontFamily: fonts.sansSemiBold,
-                      fontSize: text.micro,
-                      letterSpacing: 0.6,
-                      textTransform: 'uppercase',
-                      color: c.mutedForeground,
-                    }}
-                  >
-                    Recent
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {history.map((query) => (
-                      <Chip key={query} onPress={() => ask(query)}>
-                        {query}
-                      </Chip>
-                    ))}
+                <Reveal distance={4} delay={80}>
+                  <View style={{ gap: 8 }}>
+                    <Text
+                      style={{
+                        fontFamily: fonts.sansSemiBold,
+                        fontSize: text.micro,
+                        letterSpacing: 0.6,
+                        textTransform: 'uppercase',
+                        color: c.mutedForeground,
+                      }}
+                    >
+                      Recent
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {history.map((query) => (
+                        <Chip key={query} onPress={() => ask(query)}>
+                          {query}
+                        </Chip>
+                      ))}
+                    </View>
                   </View>
-                </View>
+                </Reveal>
               ) : null}
             </View>
           ) : null}
 
-          {messages.map((message) =>
-            message.role === 'user' ? (
-              <UserMessage key={message.id} text={message.text} />
-            ) : message.kind === 'action' ? (
-              <ActionConfirm
-                key={message.id}
-                proposal={message.proposal}
-                state={message.actionState}
-                error={message.actionError}
-                onConfirm={() => confirmAction(message.id)}
-                onCancel={() => cancelAction(message.id)}
-              />
-            ) : message.kind === 'planner' ? (
-              <PlannerMessage
-                key={message.id}
-                message={message}
-                onOpen={() => {
-                  setPlanScope(message.scope || 'general')
-                  setPlanOpen(true)
-                }}
-              />
-            ) : message.kind === 'note-draft' ? (
-              <NoteDraftMessage
-                key={message.id}
-                message={message}
-                onOpen={() => {
-                  setNoteDraft(message.draft)
-                  setNoteDraftMessageId(message.id)
-                  setNoteFormOpen(true)
-                }}
-                onDiscard={() => setMessages((prev) => prev.filter((entry) => entry.id !== message.id))}
-              />
-            ) : message.kind === 'note-error' ? (
-              <NoteErrorCard
-                key={message.id}
-                message={message}
-                canRetry={aiEnabled && !inCooldown() && !pending}
-                onRetry={() => retryNote(message)}
-              />
-            ) : (
-              <AssistantMessage key={message.id} message={message} onFollowUp={ask} />
-            ),
-          )}
+          {messages.map((message) => (
+            <Reveal
+              key={message.id}
+              distance={message.role === 'user' ? 4 : 6}
+              offsetX={message.role === 'user' ? 8 : -6}
+            >
+              {message.role === 'user' ? (
+                <UserMessage text={message.text} />
+              ) : message.kind === 'action' ? (
+                <ActionConfirm
+                  proposal={message.proposal}
+                  state={message.actionState}
+                  error={message.actionError}
+                  onConfirm={(category) => confirmAction(message.id, category)}
+                  onCancel={() => cancelAction(message.id)}
+                />
+              ) : message.kind === 'planner' ? (
+                <PlannerMessage
+                  message={message}
+                  onOpen={() => {
+                    setPlanScope(message.scope || 'general')
+                    setPlanOpen(true)
+                  }}
+                />
+              ) : message.kind === 'note-draft' ? (
+                <NoteDraftMessage
+                  message={message}
+                  onOpen={() => {
+                    setNoteDraft(message.draft)
+                    setNoteDraftMessageId(message.id)
+                    setNoteFormOpen(true)
+                  }}
+                  onDiscard={() => setMessages((prev) => prev.filter((entry) => entry.id !== message.id))}
+                />
+              ) : message.kind === 'note-error' ? (
+                <NoteErrorCard
+                  message={message}
+                  canRetry={aiEnabled && !inCooldown() && !pending}
+                  onRetry={() => retryNote(message)}
+                />
+              ) : (
+                <AssistantMessage message={message} onFollowUp={ask} />
+              )}
+            </Reveal>
+          ))}
 
-          {pending ? <ThinkingBubble /> : null}
-        </ScrollView>
+          {pending ? (
+            <Reveal key="thinking" distance={4} offsetX={-6}>
+              <ThinkingBubble />
+            </Reveal>
+          ) : null}
+          </ScrollView>
+          <NewReplyPill visible={newReply} onPress={() => scrollToLatest()} />
+        </View>
 
         <View
           style={{
             borderTopWidth: StyleSheet.hairlineWidth,
             borderTopColor: c.line,
-            paddingHorizontal: 12,
+            paddingHorizontal: 16,
             paddingTop: 10,
-            paddingBottom: Math.max(insets.bottom, 10),
+            paddingBottom: keyboardVisible ? 10 : Math.max(insets.bottom, 10),
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -642,7 +900,8 @@ export default function AskAI() {
               onChangeText={setInput}
               onSubmitEditing={() => ask(input)}
               returnKeyType="send"
-              placeholder="Ask about your spending, notes, plans or study"
+              accessibilityLabel="Message Zen-I"
+              placeholder="Ask about money, notes, plans or study"
               placeholderTextColor={c.mutedForeground}
               style={{
                 flex: 1,

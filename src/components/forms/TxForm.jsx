@@ -121,7 +121,7 @@ export default function TxForm({ visible, onClose, record }) {
         </View>
         {!accounts.length ? (
           <Text style={{ fontFamily: fonts.sans, fontSize: text.micro, color: c.mutedForeground }}>
-            Add an account in Money to tag spending to it.
+            Add an account in Settings to tag spending to it.
           </Text>
         ) : null}
       </View>

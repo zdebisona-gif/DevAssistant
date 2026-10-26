@@ -1,6 +1,6 @@
 -- Everyday tasks.
 --
--- Tasks are a simple checklist that lives alongside the planner, but not inside the
+-- Tasks are   a simple checklist that lives alongside the planner, but not inside the
 -- calendar: they have an optional due date and a done flag, and never block a time slot.
 -- Due dates are optional so "someday" tasks stay usable.
 

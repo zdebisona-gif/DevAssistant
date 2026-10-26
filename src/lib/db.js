@@ -26,6 +26,7 @@ export async function loadAll() {
     tasks,
     sleepLogs,
     sleepCreditEvents,
+    goals,
   ] = await Promise.all([
     selectAll('budgets', { column: 'category' }),
     selectAll('transactions', { column: 'occurred_on', ascending: false }),
@@ -42,6 +43,7 @@ export async function loadAll() {
     selectAll('tasks', { column: 'created_at', ascending: false }),
     selectAll('sleep_logs', { column: 'log_date', ascending: false }),
     selectAll('sleep_credit_events', { column: 'created_at', ascending: false }),
+    selectAll('goals', { column: 'due_date', ascending: true }),
   ])
   return {
     budgets,
@@ -59,6 +61,7 @@ export async function loadAll() {
     tasks,
     sleepLogs,
     sleepCreditEvents,
+    goals,
   }
 }
 
@@ -134,6 +137,10 @@ export const deleteTask = (id) => remove('tasks', id)
 export const addSleepLog = (row) => insert('sleep_logs', row)
 export const updateSleepLog = (id, patch) => update('sleep_logs', id, patch)
 export const deleteSleepLog = (id) => remove('sleep_logs', id)
+
+export const addGoal = (row) => insert('goals', row)
+export const updateGoal = (id, patch) => update('goals', id, patch)
+export const deleteGoal = (id) => remove('goals', id)
 
 /** Wipe every record the signed-in account owns. Scoped server-side by auth.uid(). */
 export async function deleteAllData() {

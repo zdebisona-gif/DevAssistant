@@ -204,6 +204,7 @@ export function buildNoteContext(note) {
   if (!note) return { context: '', sources: [] }
   const lines = [`Note title: ${note.title}`]
   if (note.tag) lines.push(`Tag: ${note.tag}`)
+  if (note.important) lines.push('Marked important: yes')
   lines.push(`Body:\n${String(note.body || '').slice(0, 2000)}`)
   return { context: lines.join('\n'), sources: ['Notes'] }
 }

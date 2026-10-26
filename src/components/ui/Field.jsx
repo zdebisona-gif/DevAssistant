@@ -49,11 +49,11 @@ export default function Field({
         returnKeyType={returnKeyType}
         editable={enabled}
         accessibilityLabel={label}
-        accessibilityHint={error || undefined}
+        accessibilityHint={error || hint || undefined}
         accessibilityLabelledBy={labelId}
         accessibilityState={{ disabled: !enabled }}
         style={{
-          minHeight: multiline ? 88 : 46,
+          minHeight: multiline ? 96 : 48,
           borderRadius: radius.md,
           borderWidth: 1,
           borderColor: error ? c.destructive : c.border,

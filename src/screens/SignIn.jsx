@@ -46,7 +46,7 @@ export default function SignIn() {
         <ScrollView
           contentContainerStyle={{
             flexGrow: 1,
-            paddingHorizontal: 20,
+            paddingHorizontal: 16,
             paddingTop: insets.top + 16,
             paddingBottom: Math.max(insets.bottom, 16) + 24,
             justifyContent: 'space-between',
@@ -95,7 +95,7 @@ export default function SignIn() {
               </Text>
             </View>
 
-            <View style={{ gap: 14 }}>
+            <View style={{ gap: 12 }}>
               <Field
                 label="Email"
                 value={email}
@@ -148,8 +148,8 @@ export default function SignIn() {
               color: c.mutedForeground,
             }}
           >
-            This is a private, single-account app. The account is created in Supabase; there is no
-            public sign-up.
+            Access is managed in Supabase. This is a private, single-account app with no public
+            sign-up.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

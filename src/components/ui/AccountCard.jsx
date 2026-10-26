@@ -1,10 +1,12 @@
+import { memo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { DotsThreeVertical, Minus, Plus } from '../../icons.js'
 import { ACCOUNT_KIND_LABELS } from '../../data/constants.js'
 import { moneyOr } from '../../lib/format.js'
-import { accountGradients } from '../../theme/tokens.js'
+import { accountColorGradients, accountGradients } from '../../theme/tokens.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
+import IconButton from './IconButton.jsx'
 
 /*
  * A manual account drawn as a physical-looking card: a branded gradient surface with the
@@ -19,31 +21,25 @@ export const ACCOUNT_CARD_HEIGHT = 172
 
 function CardIconButton({ icon: Icon, accessibilityLabel, onPress }) {
   return (
-    <Pressable
-      accessibilityRole="button"
+    <IconButton
+      icon={Icon}
+      size={36}
+      iconSize={15}
+      color="#ffffff"
+      background="rgba(255,255,255,0.16)"
+      pressedBackground="rgba(255,255,255,0.32)"
       accessibilityLabel={accessibilityLabel}
-      onPress={(event) => {
-        event.stopPropagation()
-        onPress()
-      }}
+      onPress={onPress}
       hitSlop={6}
-      style={({ pressed }) => ({
-        width: 36,
-        height: 36,
-        borderRadius: 999,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: pressed ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.16)',
-      })}
-    >
-      <Icon size={15} weight="bold" color="#ffffff" />
-    </Pressable>
+      ripple={false}
+      stopPropagation
+    />
   )
 }
 
-export default function AccountCard({ account, hidden, onEdit, onAdjust, onMenu }) {
+function AccountCard({ account, hidden, onEdit, onAdjust, onMenu }) {
   const { fonts, text, radius } = useTheme()
-  const [from, to] = TONES[account.kind] || TONES.other
+  const [from, to] = accountColorGradients[account.color] || TONES[account.kind] || TONES.other
   const gradientId = `zeni-account-${account.id}`
   const kindLabel = ACCOUNT_KIND_LABELS[account.kind] || ACCOUNT_KIND_LABELS.other
 
@@ -161,3 +157,5 @@ export default function AccountCard({ account, hidden, onEdit, onAdjust, onMenu 
     </Pressable>
   )
 }
+
+export default memo(AccountCard)

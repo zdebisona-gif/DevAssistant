@@ -1,20 +1,28 @@
+import * as Haptics from 'expo-haptics'
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import {
   CalendarBlank,
-  Check,
   CheckCircle,
   PencilSimple,
   Plus,
   Sparkle,
   Trash,
+  WarningCircle,
 } from '../icons.js'
 import Button from '../components/ui/Button.jsx'
+import CheckBox from '../components/ui/CheckBox.jsx'
+import Collapse from '../components/ui/Collapse.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
+import FadeSwap from '../components/ui/FadeSwap.jsx'
 import Loading from '../components/ui/Loading.jsx'
+import MissedBadge from '../components/ui/MissedBadge.jsx'
 import MonthCalendar from '../components/ui/MonthCalendar.jsx'
+import PriorityBadge from '../components/ui/PriorityBadge.jsx'
+import Reveal from '../components/ui/Reveal.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
+import SegmentedControl from '../components/ui/SegmentedControl.jsx'
 import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
 import TaskForm from '../components/forms/TaskForm.jsx'
@@ -24,7 +32,7 @@ import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
 import { confirmDelete, reportError } from '../lib/alerts.js'
 import { useRowActions } from '../lib/rowActions.jsx'
-import { entriesOn, formatDateShort, todayISO, upcomingEntries } from '../lib/analytics.js'
+import { entriesOn, formatDateShort, isPlanEntryMissed, todayISO } from '../lib/analytics.js'
 import { formatClock12 } from '../lib/format.js'
 import { splitTasks, taskDueMeta } from '../lib/tasks.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
@@ -53,10 +61,13 @@ export default function Planner() {
     reload,
     deletePlanEntry,
     togglePlanEntry,
+    updatePlanEntry,
     deleteTask,
     toggleTask,
+    updateTask,
   } = useData()
   const [selectedDate, setSelectedDate] = useState(todayISO())
+  const [tab, setTab] = useState('day')
   const [formOpen, setFormOpen] = useState(false)
   const [draftDate, setDraftDate] = useState(null)
   const [record, setRecord] = useState(null)
@@ -71,6 +82,8 @@ export default function Planner() {
   const isPending = (id) => pendingIds.includes(id)
 
   const applyToggle = async (run, id, done) => {
+    if (isPending(id)) return
+    Haptics.selectionAsync().catch(() => {})
     setPendingIds((prev) => [...prev, id])
     try {
       await run(id, done)
@@ -81,9 +94,20 @@ export default function Planner() {
     }
   }
 
+  const togglePriority = async (row, update) => {
+    Haptics.selectionAsync().catch(() => {})
+    try {
+      await update(row.id, { priority: !row.priority })
+    } catch (cause) {
+      reportError(cause)
+    }
+  }
+
   const openForm = (date) => {
+    const target = date ?? selectedDate
+    if (target < todayISO()) return
     setRecord(null)
-    setDraftDate(date ?? selectedDate)
+    setDraftDate(target)
     setFormOpen(true)
   }
 
@@ -116,6 +140,12 @@ export default function Planner() {
       actions: [
         { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditEntry(entry) },
         {
+          key: 'priority',
+          label: entry.priority ? 'Remove priority' : 'Mark as priority',
+          icon: WarningCircle,
+          onPress: () => togglePriority(entry, updatePlanEntry),
+        },
+        {
           key: 'delete',
           label: 'Delete',
           icon: Trash,
@@ -126,14 +156,21 @@ export default function Planner() {
     })
   }
 
-  const taskActions = (task) =>
-    open({
+  const taskActions = (task) => {
+    const due = taskDueMeta(task)
+    return open({
       title: task.title,
-      subtitle: [task.tag, task.due_date ? formatDateShort(task.due_date) : 'No due date']
+      subtitle: [task.priority ? 'Priority' : null, task.tag, due.label]
         .filter(Boolean)
         .join(' · '),
       actions: [
         { key: 'edit', label: 'Edit', icon: PencilSimple, onPress: () => openEditTask(task) },
+        {
+          key: 'priority',
+          label: task.priority ? 'Remove priority' : 'Mark as priority',
+          icon: WarningCircle,
+          onPress: () => togglePriority(task, updateTask),
+        },
         {
           key: 'delete',
           label: 'Delete',
@@ -143,6 +180,7 @@ export default function Planner() {
         },
       ],
     })
+  }
 
   if (loading) {
     return (
@@ -162,9 +200,19 @@ export default function Planner() {
 
   const today = todayISO()
   const dayEntries = entriesOn(data.planner, selectedDate)
-  const upcoming = upcomingEntries(data.planner, new Date(), 5)
   const { open: openTasks, done: doneTasks } = splitTasks(data.tasks)
   const selectedIsToday = selectedDate === today
+  const selectedIsPast = selectedDate < today
+  const tasksKey = [...openTasks, ...doneTasks]
+    .map(
+      (task) =>
+        `${task.id}:${task.done}:${task.priority}:${task.due_date || ''}:${task.due_time || ''}`,
+    )
+    .join('|')
+  const dayKey = dayEntries
+    .map((entry) => `${entry.id}:${entry.done}:${entry.priority}`)
+    .join('|')
+  const planKey = `${tab}:${selectedDate}:${tab === 'tasks' ? tasksKey : dayKey}`
 
   const renderTask = (task, first) => {
     const due = taskDueMeta(task)
@@ -181,30 +229,39 @@ export default function Planner() {
           paddingVertical: 10,
           borderTopWidth: first ? 0 : StyleSheet.hairlineWidth,
           borderTopColor: c.line,
+          backgroundColor: task.priority && !checked ? c.accentSoft : 'transparent',
         }}
       >
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked }}
-          accessibilityLabel={`${task.title}, ${checked ? 'completed' : 'not completed'}`}
-          hitSlop={12}
-          onPress={() => applyToggle(toggleTask, task.id, !task.done)}
-          style={{ width: 24, height: 44, alignItems: 'center', justifyContent: 'center' }}
-        >
+        {task.priority && !checked ? (
           <View
             style={{
-              width: 20,
-              height: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: radius.sm,
-              borderWidth: 1,
-              borderColor: checked ? c.primary : c.border,
-              backgroundColor: checked ? c.primary : 'transparent',
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 3,
+              backgroundColor: c.accent,
             }}
-          >
-            {checked ? <Check size={13} weight="bold" color={c.onPrimary} /> : null}
-          </View>
+          />
+        ) : null}
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked, disabled: isPending(task.id) }}
+          accessibilityLabel={`${task.title}, ${checked ? 'completed' : 'not completed'}${
+            task.priority ? ', priority' : ''
+          }`}
+          disabled={isPending(task.id)}
+          hitSlop={8}
+          onPress={() => applyToggle(toggleTask, task.id, !task.done)}
+          style={{
+            width: 32,
+            height: 48,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: isPending(task.id) ? 0.6 : 1,
+          }}
+        >
+          <CheckBox checked={checked} borderRadius={radius.sm} />
         </Pressable>
 
         <Pressable
@@ -216,7 +273,8 @@ export default function Planner() {
           <Text
             numberOfLines={2}
             style={{
-              fontFamily: fonts.sansMedium,
+              fontFamily:
+                task.priority && !checked ? fonts.sansSemiBold : fonts.sansMedium,
               fontSize: text.body,
               color: checked ? c.mutedForeground : c.foreground,
               textDecorationLine: checked ? 'line-through' : 'none',
@@ -224,17 +282,28 @@ export default function Planner() {
           >
             {task.title}
           </Text>
-          <Text
-            numberOfLines={1}
+          <View
             style={{
-              fontFamily: fonts.mono,
-              fontSize: text.micro,
-              color: due.overdue && !checked ? c.destructiveText : c.mutedForeground,
-              fontVariant: ['tabular-nums'],
+              flexDirection: 'row',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 6,
             }}
           >
-            {[task.tag, due.label].filter(Boolean).join(' · ')}
-          </Text>
+            {task.priority && !checked ? <PriorityBadge /> : null}
+            <Text
+              numberOfLines={1}
+              style={{
+                flexShrink: 1,
+                fontFamily: fonts.mono,
+                fontSize: text.micro,
+                color: due.overdue && !checked ? c.destructiveText : c.mutedForeground,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {[task.tag, due.label].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
         </Pressable>
 
         <RowMenuButton
@@ -246,272 +315,281 @@ export default function Planner() {
   }
 
   return (
-    <Screen
-      title="Plan"
-      subtitle={monthLabel(selectedDate)}
-      right={
-        <Button size="sm" variant="secondary" onPress={() => openForm(selectedDate)}>
-          New
-        </Button>
-      }
-    >
-      <Section
-        title="Tasks"
-        action={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {openTasks.length ? (
-              <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                {openTasks.length} open
-              </Text>
-            ) : null}
+    <Screen title="Plan" subtitle={monthLabel(selectedDate)}>
+      <Reveal distance={6}>
+        <Section
+          title="Calendar"
+          action={
+            <Button size="sm" variant="ghost" icon={Sparkle} onPress={() => setAiOpen(true)}>
+              Plan with AI
+            </Button>
+          }
+        >
+          <Card style={{ padding: 12 }}>
+            <MonthCalendar
+              selectedDate={selectedDate}
+              onSelectDate={(date) => {
+                setSelectedDate(date)
+                setTab('day')
+              }}
+              entries={data.planner}
+            />
+          </Card>
+        </Section>
+      </Reveal>
+
+      <Reveal delay={40}>
+        <Section
+          title="Plan items"
+          action={
             <Button
               size="sm"
               variant="ghost"
               icon={Plus}
-              onPress={openNewTask}
-              accessibilityLabel="Add task"
+              onPress={tab === 'tasks' ? openNewTask : () => openForm(selectedDate)}
+              disabled={tab === 'day' && selectedIsPast}
+              accessibilityLabel={
+                tab === 'tasks'
+                  ? 'Add task'
+                  : selectedIsPast
+                    ? 'Past days cannot be planned'
+                    : `Add entry on ${fullDateLabel(selectedDate)}`
+              }
             >
-              Add
+              {tab === 'tasks' ? 'Add task' : 'Add entry'}
             </Button>
-          </View>
-        }
-      >
-        <Card padded={!openTasks.length && !doneTasks.length}>
-          {openTasks.length ? (
-            openTasks.map((task, index) => renderTask(task, index === 0))
+          }
+        >
+        <SegmentedControl
+          accessibilityLabel="Tasks and day plan"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { key: 'tasks', label: 'Tasks', count: openTasks.length },
+            { key: 'day', label: 'Day plan', count: dayEntries.length },
+          ]}
+        />
+
+        <FadeSwap swapKey={planKey}>
+          {tab === 'tasks' ? (
+            <Card padded={!openTasks.length && !doneTasks.length}>
+              {openTasks.length ? (
+                openTasks.map((task, index) => renderTask(task, index === 0))
+              ) : (
+                <EmptyState
+                  icon={CheckCircle}
+                  title={doneTasks.length ? 'All caught up' : 'No tasks yet'}
+                  description={
+                    doneTasks.length
+                      ? 'Add something new, or reopen a completed task below.'
+                      : 'Keep everyday items here — they stay separate from your calendar.'
+                  }
+                  action={
+                    <Button size="sm" variant="primary" onPress={openNewTask}>
+                      Add a task
+                    </Button>
+                  }
+                />
+              )}
+
+              {doneTasks.length ? (
+                <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${doneTasks.length} completed tasks`}
+                    accessibilityState={{ expanded: doneOpen }}
+                    onPress={() => setDoneOpen((value) => !value)}
+                    style={({ pressed }) => ({
+                      minHeight: 48,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 16,
+                      backgroundColor: pressed ? c.overline : 'transparent',
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: fonts.sansMedium,
+                        fontSize: text.caption,
+                        color: c.mutedForeground,
+                      }}
+                    >
+                      {doneTasks.length} completed
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fonts.sansMedium,
+                        fontSize: text.caption,
+                        color: c.primaryFg,
+                      }}
+                    >
+                      {doneOpen ? 'Hide' : 'Show'}
+                    </Text>
+                  </Pressable>
+                  <Collapse open={doneOpen}>
+                    <View>{doneTasks.map((task, index) => renderTask(task, index === 0))}</View>
+                  </Collapse>
+                </View>
+              ) : null}
+            </Card>
           ) : (
-            <EmptyState
-              icon={CheckCircle}
-              title={doneTasks.length ? 'All caught up' : 'No tasks yet'}
-              description={
-                doneTasks.length
-                  ? 'Add something new, or reopen a completed task below.'
-                  : 'Keep everyday items here — they stay separate from your calendar.'
-              }
-              action={
-                <Button size="sm" variant="primary" onPress={openNewTask}>
-                  Add a task
-                </Button>
-              }
-            />
-          )}
-
-          {doneTasks.length ? (
-            <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${doneTasks.length} completed tasks`}
-                onPress={() => setDoneOpen((value) => !value)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  backgroundColor: pressed ? c.overline : 'transparent',
-                })}
-              >
-                <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.mutedForeground }}>
-                  {doneTasks.length} completed
-                </Text>
-                <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
-                  {doneOpen ? 'Hide' : 'Show'}
-                </Text>
-              </Pressable>
-              {doneOpen ? doneTasks.map((task, index) => renderTask(task, index === 0)) : null}
-            </View>
-          ) : null}
-        </Card>
-      </Section>
-
-      <Section
-        title="Calendar"
-        action={
-          <Button size="sm" variant="ghost" icon={Sparkle} onPress={() => setAiOpen(true)}>
-            Plan with AI
-          </Button>
-        }
-      >
-        <Card style={{ padding: 12 }}>
-          <MonthCalendar
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            entries={data.planner}
-          />
-        </Card>
-      </Section>
-
-      <Section
-        title={selectedIsToday ? `Today · ${fullDateLabel(selectedDate)}` : fullDateLabel(selectedDate)}
-        action={
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={Plus}
-            onPress={() => openForm(selectedDate)}
-            accessibilityLabel={`Add entry on ${fullDateLabel(selectedDate)}`}
-          >
-            Add
-          </Button>
-        }
-      >
-        <Card padded={!dayEntries.length}>
-          {dayEntries.length ? (
-            dayEntries.map((entry, index) => {
-              const checked = isPending(entry.id) ? !entry.done : entry.done
-              return (
-              <View
-                key={entry.id}
+            <View style={{ gap: 10 }}>
+              <Text
                 style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 12,
-                  paddingLeft: 16,
-                  paddingRight: 8,
-                  paddingVertical: 10,
-                  borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
-                  borderTopColor: c.line,
+                  fontFamily: fonts.mono,
+                  fontSize: text.micro,
+                  color: c.mutedForeground,
+                  fontVariant: ['tabular-nums'],
                 }}
               >
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked }}
-                  accessibilityLabel={`${entry.title}, ${checked ? 'completed' : 'not completed'}`}
-                  hitSlop={12}
-                  onPress={() => applyToggle(togglePlanEntry, entry.id, !entry.done)}
-                  style={{ width: 24, height: 44, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <View
-                    style={{
-                      width: 20,
-                      height: 20,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: radius.sm,
-                      borderWidth: 1,
-                      borderColor: checked ? c.primary : c.border,
-                      backgroundColor: checked ? c.primary : 'transparent',
-                    }}
-                  >
-                    {checked ? <Check size={13} weight="bold" color={c.onPrimary} /> : null}
-                  </View>
-                </Pressable>
+                {selectedIsToday
+                  ? `Today · ${fullDateLabel(selectedDate)}`
+                  : fullDateLabel(selectedDate)}
+              </Text>
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${entry.title}, edit entry`}
-                  onPress={() => openEditEntry(entry)}
-                  style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 2, opacity: pressed ? 0.7 : 1 })}
-                >
-                  <Text
-                    numberOfLines={2}
-                    style={{
-                      fontFamily: fonts.sansMedium,
-                      fontSize: text.body,
-                      color: checked ? c.mutedForeground : c.foreground,
-                      textDecorationLine: checked ? 'line-through' : 'none',
-                    }}
-                  >
-                    {entry.title}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontFamily: fonts.mono,
-                      fontSize: text.micro,
-                      color: c.mutedForeground,
-                      fontVariant: ['tabular-nums'],
-                    }}
-                  >
-                    {[entry.start_time ? formatClock12(entry.start_time) : 'Anytime', entry.tag]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </Pressable>
+              <Card padded={!dayEntries.length}>
+                {dayEntries.length ? (
+                  dayEntries.map((entry, index) => {
+                    const checked = isPending(entry.id) ? !entry.done : entry.done
+                    const missed = !checked && isPlanEntryMissed(entry)
+                    return (
+                      <View
+                        key={entry.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 12,
+                          paddingLeft: 16,
+                          paddingRight: 8,
+                          paddingVertical: 10,
+                          borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+                          borderTopColor: c.line,
+                          backgroundColor: missed
+                            ? c.destructiveSoft
+                            : entry.priority && !checked
+                              ? c.accentSoft
+                              : 'transparent',
+                        }}
+                      >
+                        {missed || (entry.priority && !checked) ? (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: 3,
+                              backgroundColor: missed ? c.destructive : c.accent,
+                            }}
+                          />
+                        ) : null}
+                        <Pressable
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked, disabled: isPending(entry.id) }}
+                          accessibilityLabel={`${entry.title}, ${checked ? 'completed' : 'not completed'}${
+                            entry.priority ? ', priority' : ''
+                          }${missed ? ', missed' : ''}`}
+                          disabled={isPending(entry.id)}
+                          hitSlop={8}
+                          onPress={() => applyToggle(togglePlanEntry, entry.id, !entry.done)}
+                          style={{
+                            width: 32,
+                            height: 48,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            opacity: isPending(entry.id) ? 0.6 : 1,
+                          }}
+                        >
+                          <CheckBox checked={checked} borderRadius={radius.sm} />
+                        </Pressable>
 
-                <RowMenuButton
-                  accessibilityLabel={`${entry.title}, more options`}
-                  onPress={() => entryActions(entry.id)}
-                />
-              </View>
-              )
-            })
-          ) : (
-            <EmptyState
-              icon={CalendarBlank}
-              title="Nothing planned"
-              description={
-                selectedIsToday
-                  ? 'Add a time block for today, or pick another day on the calendar.'
-                  : 'Add an entry for this day, or choose another date.'
-              }
-              action={
-                <Button size="sm" variant="primary" onPress={() => openForm(selectedDate)}>
-                  Add an entry
-                </Button>
-              }
-            />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`${entry.title}, edit entry`}
+                          onPress={() => openEditEntry(entry)}
+                          style={({ pressed }) => ({
+                            flex: 1,
+                            minWidth: 0,
+                            gap: 2,
+                            opacity: pressed ? 0.7 : 1,
+                          })}
+                        >
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              fontFamily:
+                                entry.priority && !checked ? fonts.sansSemiBold : fonts.sansMedium,
+                              fontSize: text.body,
+                              color: checked ? c.mutedForeground : c.foreground,
+                              textDecorationLine: checked ? 'line-through' : 'none',
+                            }}
+                          >
+                            {entry.title}
+                          </Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 6,
+                            }}
+                          >
+                            {missed ? <MissedBadge /> : null}
+                            {entry.priority && !checked ? <PriorityBadge /> : null}
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                flexShrink: 1,
+                                fontFamily: fonts.mono,
+                                fontSize: text.micro,
+                                color: missed ? c.destructiveText : c.mutedForeground,
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {[
+                                entry.start_time ? formatClock12(entry.start_time) : 'Anytime',
+                                entry.tag,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </Text>
+                          </View>
+                        </Pressable>
+
+                        <RowMenuButton
+                          accessibilityLabel={`${entry.title}, more options`}
+                          onPress={() => entryActions(entry.id)}
+                        />
+                      </View>
+                    )
+                  })
+                ) : (
+                  <EmptyState
+                    icon={CalendarBlank}
+                    title={selectedIsPast ? 'Past day' : 'Nothing planned'}
+                    description={
+                      selectedIsPast
+                        ? 'Past days are view only. Pick today or a later date to plan.'
+                        : selectedIsToday
+                          ? 'Add a time block for today.'
+                          : 'Add an entry for this day.'
+                    }
+                    action={
+                      selectedIsPast ? undefined : (
+                        <Button size="sm" variant="primary" onPress={() => openForm(selectedDate)}>
+                          Add an entry
+                        </Button>
+                      )
+                    }
+                  />
+                )}
+              </Card>
+            </View>
           )}
-        </Card>
-      </Section>
-
-      <Section title="Upcoming">
-        <Card padded={!upcoming.length}>
-          {upcoming.length ? (
-            upcoming.map((entry, index) => (
-              <Pressable
-                key={entry.id}
-                accessibilityRole="button"
-                accessibilityLabel={entry.title}
-                onPress={() => openEditEntry(entry)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  paddingLeft: 16,
-                  paddingRight: 8,
-                  paddingVertical: 14,
-                  borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
-                  borderTopColor: c.line,
-                  backgroundColor: pressed ? c.overline : 'transparent',
-                })}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}
-                >
-                  {entry.title}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: fonts.mono,
-                    fontSize: text.micro,
-                    color: c.mutedForeground,
-                    fontVariant: ['tabular-nums'],
-                  }}
-                >
-                  {formatDateShort(entry.entry_date)}
-                </Text>
-                <RowMenuButton
-                  accessibilityLabel={`${entry.title}, more options`}
-                  onPress={() => entryActions(entry.id)}
-                />
-              </Pressable>
-            ))
-          ) : (
-            <EmptyState
-              title="Nothing coming up"
-              description="Add an entry to a day this month, or plan something further out."
-              action={
-                <Button size="sm" variant="primary" onPress={() => openForm()}>
-                  Add an entry
-                </Button>
-              }
-            />
-          )}
-        </Card>
-      </Section>
+        </FadeSwap>
+        </Section>
+      </Reveal>
 
       <PlanForm
         visible={formOpen}

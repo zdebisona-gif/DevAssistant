@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -41,6 +42,7 @@ export default function Lesson() {
   const [viewing, setViewing] = useState(null)
   const [writing, setWriting] = useState(false)
   const [writeError, setWriteError] = useState(null)
+  const [toggling, setToggling] = useState(false)
   const { open, sheet } = useRowActions()
 
   const located = locateLesson(id, data)
@@ -98,6 +100,20 @@ export default function Lesson() {
     setNoteOpen(true)
   }
 
+  const toggleComplete = async () => {
+    if (toggling) return
+    Haptics.selectionAsync().catch(() => {})
+    setToggling(true)
+    try {
+      await toggleLesson(lesson.id, !lesson.done)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    } catch (cause) {
+      reportError(cause)
+    } finally {
+      setToggling(false)
+    }
+  }
+
   const lessonMenu = () =>
     open({
       title: lesson.title,
@@ -107,7 +123,7 @@ export default function Lesson() {
           key: 'toggle',
           label: lesson.done ? 'Mark incomplete' : 'Mark complete',
           icon: Check,
-          onPress: () => toggleLesson(lesson.id, !lesson.done).catch(reportError),
+          onPress: toggleComplete,
         },
         { key: 'edit', label: 'Edit lesson', icon: PencilSimple, onPress: () => setEditOpen(true) },
         {
@@ -166,8 +182,13 @@ export default function Lesson() {
         accessibilityRole="button"
         accessibilityLabel={`Course ${course.name}, module ${module.title}`}
         onPress={() => router.push(`/course/${course.id}`)}
-        hitSlop={6}
-        style={{ gap: 3 }}
+        hitSlop={4}
+        style={({ pressed }) => ({
+          minHeight: 48,
+          justifyContent: 'center',
+          alignSelf: 'flex-start',
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
         <Text
           numberOfLines={1}
@@ -177,7 +198,18 @@ export default function Lesson() {
         </Text>
       </Pressable>
 
-      <ProgressBar label={progress.detail} value={progress.pct} percentOnly />
+      <View style={{ gap: 12 }}>
+        <ProgressBar label={progress.detail} value={progress.pct} percentOnly />
+        <Button
+          variant={lesson.done ? 'secondary' : 'primary'}
+          icon={lesson.done ? Check : undefined}
+          accessibilityLabel={lesson.done ? 'Mark lesson incomplete' : 'Mark lesson complete'}
+          loading={toggling}
+          onPress={toggleComplete}
+        >
+          {lesson.done ? 'Completed' : 'Mark complete'}
+        </Button>
+      </View>
 
       <Card padded>
         {lesson.content ? (
@@ -232,30 +264,22 @@ export default function Lesson() {
 
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <Button
-          size="sm"
-          variant="ghost"
+          variant="secondary"
           icon={ArrowLeft}
           disabled={!prev}
           accessibilityLabel="Previous lesson"
           onPress={() => prev && router.replace(`/lesson/${prev.id}`)}
+          style={{ flex: 1 }}
         >
           Previous
         </Button>
         <Button
-          variant={lesson.done ? 'secondary' : 'primary'}
-          icon={lesson.done ? Check : undefined}
-          onPress={() => toggleLesson(lesson.id, !lesson.done).catch(reportError)}
-          style={{ flex: 1 }}
-        >
-          {lesson.done ? 'Completed' : 'Mark complete'}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
+          variant="secondary"
           icon={ArrowRight}
           disabled={!next}
           accessibilityLabel="Next lesson"
           onPress={() => next && router.replace(`/lesson/${next.id}`)}
+          style={{ flex: 1 }}
         >
           Next
         </Button>

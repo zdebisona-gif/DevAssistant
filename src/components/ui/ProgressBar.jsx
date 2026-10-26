@@ -1,10 +1,15 @@
-import { Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Animated, Easing, Text, View } from 'react-native'
+import { useReducedMotion } from '../../lib/useReducedMotion.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
-function toneFor(pct, c) {
-  if (pct >= 100) return c.destructive
-  if (pct >= 85) return c.accent
-  return c.primary
+function toneFor(pct, c, tone) {
+  if (tone === 'limit') {
+    if (pct >= 100) return c.destructive
+    if (pct >= 85) return c.accent
+    return c.primary
+  }
+  return pct >= 100 ? c.success : c.primary
 }
 
 export default function ProgressBar({
@@ -14,14 +19,28 @@ export default function ProgressBar({
   unit = '',
   meta,
   percentOnly = false,
+  tone = 'progress',
   style,
 }) {
-  const { c, fonts, text } = useTheme()
-  const pct = percentOnly
-    ? Math.round(value)
-    : limit > 0
-      ? Math.round((value / limit) * 100)
-      : 0
+  const { c, fonts, text, motion } = useTheme()
+  const reduced = useReducedMotion()
+  const raw = percentOnly ? value : limit > 0 ? (value / limit) * 100 : 0
+  const pct = Number.isFinite(raw) ? Math.min(100, Math.max(0, Math.round(raw))) : 0
+  const [fill] = useState(() => new Animated.Value(pct))
+
+  useEffect(() => {
+    if (reduced) {
+      fill.setValue(pct)
+      return
+    }
+
+    Animated.timing(fill, {
+      toValue: pct,
+      duration: motion.base,
+      easing: Easing.bezier(0.22, 0, 0, 1),
+      useNativeDriver: true,
+    }).start()
+  }, [pct, reduced, fill, motion.base])
 
   const rightText = percentOnly
     ? `${pct}%`
@@ -61,12 +80,16 @@ export default function ProgressBar({
         </Text>
       </View>
       <View style={{ height: 6, width: '100%', overflow: 'hidden', borderRadius: 999, backgroundColor: c.muted }}>
-        <View
+        <Animated.View
           style={{
+            width: '100%',
             height: '100%',
-            width: `${Math.min(Math.max(pct, 0), 100)}%`,
             borderRadius: 999,
-            backgroundColor: toneFor(pct, c),
+            backgroundColor: toneFor(pct, c, tone),
+            transform: [
+              { scaleX: fill.interpolate({ inputRange: [0, 100], outputRange: [0, 1] }) },
+            ],
+            transformOrigin: [0, 0.5, 0],
           }}
         />
       </View>

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import * as SystemUI from 'expo-system-ui'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useColorScheme } from 'react-native'
 import { fonts, motion, palettes, radius, shadow, spacing, text } from './tokens.js'
 
@@ -22,6 +23,16 @@ export function ThemeProvider({ children }) {
     }
   }, [])
 
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(palettes[mode].background).catch(() => {})
+  }, [mode])
+
+  const toggle = useCallback(() => {
+    const next = mode === 'light' ? 'dark' : 'light'
+    setMode(next)
+    AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {})
+  }, [mode])
+
   const value = useMemo(
     () => ({
       mode,
@@ -32,14 +43,9 @@ export function ThemeProvider({ children }) {
       motion,
       fonts,
       shadow: shadow(mode),
-      toggle: () =>
-        setMode((current) => {
-          const next = current === 'light' ? 'dark' : 'light'
-          AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {})
-          return next
-        }),
+      toggle,
     }),
-    [mode],
+    [mode, toggle],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

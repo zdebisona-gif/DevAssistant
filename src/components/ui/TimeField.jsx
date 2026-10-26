@@ -44,9 +44,10 @@ export default function TimeField({ label, value, onChange, hint }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${formatClock12(value) || 'not set'}`}
+        accessibilityState={{ expanded: open }}
         onPress={() => setOpen((prev) => !prev)}
-        style={{
-          minHeight: 46,
+        style={({ pressed }) => ({
+          minHeight: 48,
           borderRadius: radius.md,
           borderWidth: 1,
           borderColor: open ? c.primary : c.border,
@@ -56,9 +57,18 @@ export default function TimeField({ label, value, onChange, hint }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 8,
-        }}
+          opacity: pressed ? 0.75 : 1,
+        })}
       >
-        <Text style={{ fontFamily: fonts.mono, fontSize: text.body, color: value ? c.foreground : c.mutedForeground }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            flexShrink: 1,
+            fontFamily: fonts.mono,
+            fontSize: text.body,
+            color: value ? c.foreground : c.mutedForeground,
+          }}
+        >
           {formatClock12(value) || 'No time'}
         </Text>
         <CaretRight
@@ -104,9 +114,16 @@ export default function TimeField({ label, value, onChange, hint }) {
           {value ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Clear ${label}`}
               onPress={() => onChange('')}
               hitSlop={6}
-              style={{ minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center' }}
+              style={({ pressed }) => ({
+                minHeight: 48,
+                minWidth: 48,
+                alignSelf: 'flex-start',
+                justifyContent: 'center',
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
               <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>Clear</Text>
             </Pressable>

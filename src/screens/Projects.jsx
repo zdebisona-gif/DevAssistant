@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Pressable, Text, View } from 'react-native'
+import { Alert, Text, View } from 'react-native'
 import { PencilSimple, Plus, Target, Trash, WarningCircle } from '../icons.js'
 import AtonementSheet from '../components/assistant/AtonementSheet.jsx'
 import SubmissionSheet from '../components/assistant/SubmissionSheet.jsx'
@@ -13,6 +13,7 @@ import Loading from '../components/ui/Loading.jsx'
 import RowMenuButton from '../components/ui/RowMenuButton.jsx'
 import StatCard from '../components/ui/StatCard.jsx'
 import { useData } from '../data/store.jsx'
+import { useAiPrefs } from '../data/aiPrefs.jsx'
 import { confirmDelete, reportError } from '../lib/alerts.js'
 import {
   FORFEIT_CREDITS,
@@ -32,6 +33,7 @@ const STATUS_TONE = { passed: 'success', failed: 'destructive', missed: 'destruc
 export default function Projects() {
   const { c, fonts, radius, text } = useTheme()
   const { data, loading, error, reload, updateProject, createPenalty, deleteProject } = useData()
+  const { enabled: aiEnabled } = useAiPrefs()
   const [formOpen, setFormOpen] = useState(false)
   const [editRecord, setEditRecord] = useState(null)
   const [submitTarget, setSubmitTarget] = useState(null)
@@ -85,8 +87,8 @@ export default function Projects() {
                 reason: 'missed',
                 credits: FORFEIT_CREDITS,
               })
-            } catch {
-              /* the store surfaces the failure on the next reload */
+            } catch (cause) {
+              reportError(cause)
             }
           },
         },
@@ -140,15 +142,13 @@ export default function Projects() {
       tabbed={false}
       right={
         <Button
-          size="sm"
+          size="icon"
           variant="primary"
           icon={Plus}
           onPress={openNew}
           disabled={locked}
           accessibilityLabel="New project"
-        >
-          New
-        </Button>
+        />
       }
     >
       <View style={{ flexDirection: 'row', gap: 16 }}>
@@ -212,10 +212,7 @@ export default function Projects() {
                     paddingVertical: 10,
                   }}
                 >
-                  <Pressable
-                    onPress={() => setSubmitTarget(project)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Submit ${project.title}`}
+                  <View
                     style={{ flex: 1, gap: 3 }}
                   >
                     <Text
@@ -239,7 +236,7 @@ export default function Projects() {
                     >
                       {dueLine(project)}
                     </Text>
-                  </Pressable>
+                  </View>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -247,7 +244,11 @@ export default function Projects() {
                   >
                     Submit
                   </Button>
-                  <RowMenuButton compact onPress={() => projectMenu(project)} />
+                  <RowMenuButton
+                    compact
+                    accessibilityLabel={`${project.title}, more options`}
+                    onPress={() => projectMenu(project)}
+                  />
                 </View>
               )
             })}
@@ -259,7 +260,9 @@ export default function Projects() {
             description={
               locked
                 ? 'Clear your open penalty first.'
-                : 'Commit to a deliverable with a deadline. Submit it and Gemini judges whether it passes.'
+                : aiEnabled
+                  ? 'Commit to a deliverable with a deadline. Submit it and Gemini judges whether it passes.'
+                  : 'Commit to a deliverable with a deadline. Submit it and assess the result yourself.'
             }
             action={
               locked ? null : (
@@ -309,7 +312,11 @@ export default function Projects() {
                     </Text>
                   ) : null}
                 </View>
-                <RowMenuButton compact onPress={() => projectMenu(project)} />
+                <RowMenuButton
+                  compact
+                  accessibilityLabel={`${project.title}, more options`}
+                  onPress={() => projectMenu(project)}
+                />
               </View>
             ))}
           </View>

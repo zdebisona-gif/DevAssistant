@@ -41,7 +41,9 @@ export function courseTree(course, data) {
     done,
     pct: lessons.length ? Math.round((done / lessons.length) * 100) : 0,
     next: lessons.find((lesson) => !lesson.done) || null,
-    detail: `${done} / ${lessons.length} lessons`,
+    detail: lessons.length
+      ? `${done} / ${lessons.length} ${lessons.length === 1 ? 'lesson' : 'lessons'}`
+      : 'No lessons yet',
   }
 }
 
@@ -113,19 +115,6 @@ export function continueTarget(data) {
   const firstTree = coursesTree(data)[0]
   const firstLesson = firstTree?.modules[0]?.lessons[0]
   return firstLesson ? locateLesson(firstLesson.id, data) : null
-}
-
-export function learningStats(data) {
-  const trees = coursesTree(data)
-  const totalLessons = trees.reduce((sum, tree) => sum + tree.total, 0)
-  const completedLessons = trees.reduce((sum, tree) => sum + tree.done, 0)
-  return {
-    activeCourses: trees.filter((tree) => tree.total === 0 || tree.done < tree.total).length,
-    courses: trees.length,
-    completedLessons,
-    totalLessons,
-    pct: totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0,
-  }
 }
 
 /**

@@ -3,6 +3,7 @@ import { Text, View } from 'react-native'
 import Button from '../ui/Button.jsx'
 import Field from '../ui/Field.jsx'
 import Sheet from '../ui/Sheet.jsx'
+import SwitchRow from '../ui/SwitchRow.jsx'
 import TagPicker from '../ui/TagPicker.jsx'
 import { NOTE_TAGS } from '../../data/constants.js'
 import { useData } from '../../data/store.jsx'
@@ -16,6 +17,7 @@ export default function NoteForm({ visible, onClose, record, defaults = null, no
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tag, setTag] = useState(NOTE_TAGS[0])
+  const [important, setImportant] = useState(false)
   const [link, setLink] = useState({ course_id: null, lesson_id: null })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -26,15 +28,25 @@ export default function NoteForm({ visible, onClose, record, defaults = null, no
     setTitle(record?.title ?? defaults?.title ?? '')
     setBody(record?.body ?? defaults?.body ?? '')
     setTag(record?.tag ?? defaults?.tag ?? NOTE_TAGS[0])
+    setImportant(Boolean(record?.important ?? defaults?.important))
     setLink({
       course_id: record?.course_id ?? defaults?.course_id ?? null,
       lesson_id: record?.lesson_id ?? defaults?.lesson_id ?? null,
     })
     setError(null)
     setSaving(false)
-  }, [visible, record, defaults?.title, defaults?.body, defaults?.tag, defaults?.course_id, defaults?.lesson_id])
+  }, [
+    visible,
+    record,
+    defaults?.title,
+    defaults?.body,
+    defaults?.tag,
+    defaults?.important,
+    defaults?.course_id,
+    defaults?.lesson_id,
+  ])
 
-  const result = validateNote({ title, body, tag, ...link })
+  const result = validateNote({ title, body, tag, important, ...link })
   const valid = result.ok
 
   const submit = async () => {
@@ -64,6 +76,14 @@ export default function NoteForm({ visible, onClose, record, defaults = null, no
       <Field label="Title" value={title} onChangeText={setTitle} placeholder="What's this about?" autoFocus={!editing} />
       <Field label="Body" value={body} onChangeText={setBody} placeholder="Write it down…" multiline />
       <TagPicker label="Tag" options={NOTE_TAGS} value={tag} onChange={setTag} />
+      <View style={{ marginHorizontal: -16 }}>
+        <SwitchRow
+          label="Important"
+          description="Keep this note at the top of Notes."
+          value={important}
+          onValueChange={setImportant}
+        />
+      </View>
       {error ? (
         <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>{error}</Text>
       ) : null}

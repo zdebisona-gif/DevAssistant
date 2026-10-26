@@ -3,7 +3,8 @@ import { Pressable, Text, View } from 'react-native'
 import { CaretLeft, CaretRight, Sparkle } from '../../icons.js'
 import Button from '../ui/Button.jsx'
 import { Card } from '../ui/Card.jsx'
-import Chip from '../ui/Chip.jsx'
+import FadeSwap from '../ui/FadeSwap.jsx'
+import SegmentedControl from '../ui/SegmentedControl.jsx'
 import StatCard from '../ui/StatCard.jsx'
 import { useAiPrefs } from '../../data/aiPrefs.jsx'
 import { describeGeminiError, inCooldown, sleepRecap } from '../../lib/gemini.js'
@@ -88,6 +89,12 @@ function SleepChart({ summary, period }) {
   }
 
   const leading = (new Date(`${summary.start}T00:00:00`).getDay() + 6) % 7
+  const monthCells = [...Array.from({ length: leading }, () => null), ...summary.days]
+  const weeks = []
+  for (let index = 0; index < monthCells.length; index += 7) {
+    weeks.push(monthCells.slice(index, index + 7))
+  }
+
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row' }}>
@@ -106,31 +113,36 @@ function SleepChart({ summary, period }) {
           </Text>
         ))}
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {Array.from({ length: leading }, (_, index) => (
-          <View key={`blank-${index}`} style={{ width: `${100 / 7}%`, height: 48 }} />
-        ))}
-        {summary.days.map((day) => (
-          <View
-            key={day.date}
-            accessibilityLabel={`${day.date}, ${day.log ? formatDuration(day.minutes) : 'no sleep'}`}
-            style={{ width: `${100 / 7}%`, height: 48, alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}
-          >
-            <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-              {dayNumber(day.date)}
-            </Text>
-            <View
-              style={{
-                width: 8,
-                height: Math.max(3, Math.round((day.minutes / maxMinutes) * 24)),
-                borderRadius: radius.pill,
-                backgroundColor: barColor(day, c),
-                opacity: day.log ? 1 : 0.3,
-              }}
-            />
-          </View>
-        ))}
-      </View>
+      {weeks.map((week, weekIndex) => (
+        <View key={`week-${weekIndex}`} style={{ flexDirection: 'row' }}>
+          {week.map((day, index) => {
+            if (!day) {
+              return <View key={`blank-${weekIndex}-${index}`} style={{ flex: 1, height: 48 }} />
+            }
+
+            return (
+              <View
+                key={day.date}
+                accessibilityLabel={`${day.date}, ${day.log ? formatDuration(day.minutes) : 'no sleep'}`}
+                style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}
+              >
+                <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+                  {dayNumber(day.date)}
+                </Text>
+                <View
+                  style={{
+                    width: 8,
+                    height: Math.max(3, Math.round((day.minutes / maxMinutes) * 24)),
+                    borderRadius: radius.pill,
+                    backgroundColor: barColor(day, c),
+                    opacity: day.log ? 1 : 0.3,
+                  }}
+                />
+              </View>
+            )
+          })}
+        </View>
+      ))}
     </View>
   )
 }
@@ -215,29 +227,46 @@ export default function SleepSummary({ logs }) {
   }
 
   return (
-    <Card padded>
+    <Card padded style={{ gap: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          <Chip active={period === 'week'} onPress={() => setPeriodAndReset('week')}>
-            Week
-          </Chip>
-          <Chip active={period === 'month'} onPress={() => setPeriodAndReset('month')}>
-            Month
-          </Chip>
-        </View>
+        <SegmentedControl
+          accessibilityLabel="Sleep summary period"
+          value={period}
+          onChange={setPeriodAndReset}
+          options={[
+            { key: 'week', label: 'Week' },
+            { key: 'month', label: 'Month' },
+          ]}
+          style={{ width: 156 }}
+        />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Previous period"
             onPress={() => move(offset - 1)}
             hitSlop={8}
-            style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+            style={({ pressed }) => ({
+              width: 32,
+              height: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.6 : 1,
+            })}
           >
             <CaretLeft size={16} weight="bold" color={c.foreground} />
           </Pressable>
-          <Text style={{ minWidth: 92, textAlign: 'center', fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.foreground }}>
-            {bounds.label}
-          </Text>
+          <FadeSwap swapKey={bounds.label} style={{ minWidth: 92 }}>
+            <Text
+              style={{
+                textAlign: 'center',
+                fontFamily: fonts.sansMedium,
+                fontSize: text.caption,
+                color: c.foreground,
+              }}
+            >
+              {bounds.label}
+            </Text>
+          </FadeSwap>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Next period"
@@ -245,65 +274,75 @@ export default function SleepSummary({ logs }) {
             onPress={() => move(offset + 1)}
             disabled={offset >= 0}
             hitSlop={8}
-            style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', opacity: offset >= 0 ? 0.3 : 1 }}
+            style={({ pressed }) => ({
+              width: 32,
+              height: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: offset >= 0 ? 0.3 : pressed ? 0.6 : 1,
+            })}
           >
             <CaretRight size={16} weight="bold" color={c.foreground} />
           </Pressable>
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-        <StatCard
-          label="Average sleep"
-          value={summary.averageMinutes === null ? '—' : formatDuration(summary.averageMinutes)}
-          hint={`${summary.nights} ${summary.nights === 1 ? 'night' : 'nights'} logged`}
-        />
-        <StatCard
-          label="Average score"
-          value={summary.averageScore === null ? '—' : `${summary.averageScore}/100`}
-          hint={`${summary.assessed} assessed`}
-        />
-        <StatCard
-          label="Average quality"
-          value={summary.averageRating === null ? '—' : `${summary.averageRating}/5`}
-          hint={summary.stale ? `${summary.stale} need update` : 'Up to date'}
-        />
-        <StatCard
-          label="Points"
-          value={signed(summary.points)}
-          hint="From these nights"
-        />
-      </View>
+      <FadeSwap swapKey={`${period}:${offset}:${summary.nights}`}>
+        <View style={{ gap: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <StatCard
+              label="Average sleep"
+              value={summary.averageMinutes === null ? '—' : formatDuration(summary.averageMinutes)}
+              hint={`${summary.nights} ${summary.nights === 1 ? 'night' : 'nights'} logged`}
+            />
+            <StatCard
+              label="Average score"
+              value={summary.averageScore === null ? '—' : `${summary.averageScore}/100`}
+              hint={`${summary.assessed} assessed`}
+            />
+            <StatCard
+              label="Average quality"
+              value={summary.averageRating === null ? '—' : `${summary.averageRating}/5`}
+              hint={summary.stale ? `${summary.stale} need update` : 'Up to date'}
+            />
+            <StatCard label="Points" value={signed(summary.points)} hint="From these nights" />
+          </View>
 
-      <SleepChart summary={summary} period={period} />
+          <SleepChart summary={summary} period={period} />
+        </View>
+      </FadeSwap>
 
       {summary.nights ? (
         <View style={{ gap: 8 }}>
-          {visibleRecap ? (
-            <View
-              style={{
-                borderLeftWidth: 2,
-                borderLeftColor: c.accent,
-                paddingLeft: 10,
-                gap: 6,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Sparkle size={13} weight="bold" color={c.accent} />
-                <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                  AI · Gemini
+          <FadeSwap swapKey={visibleRecap ? 'recap' : visibleError ? 'error' : 'idle'}>
+            <View style={{ gap: 8 }}>
+              {visibleRecap ? (
+                <View
+                  style={{
+                    borderLeftWidth: 2,
+                    borderLeftColor: c.accent,
+                    paddingLeft: 10,
+                    gap: 6,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Sparkle size={13} weight="bold" color={c.accent} />
+                    <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+                      AI · Gemini
+                    </Text>
+                  </View>
+                  <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 19, color: c.body }}>
+                    {visibleRecap}
+                  </Text>
+                </View>
+              ) : null}
+              {visibleError ? (
+                <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructiveText }}>
+                  {visibleError}
                 </Text>
-              </View>
-              <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 19, color: c.body }}>
-                {visibleRecap}
-              </Text>
+              ) : null}
             </View>
-          ) : null}
-          {visibleError ? (
-            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructive }}>
-              {visibleError}
-            </Text>
-          ) : null}
+          </FadeSwap>
           {canRecap ? (
             <Button variant="secondary" size="sm" icon={Sparkle} onPress={generateRecap} loading={recapBusy}>
               {visibleRecap ? 'Recap again' : 'Recap with Gemini'}

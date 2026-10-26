@@ -74,22 +74,27 @@ not truthfully copy this cross-record grounding.
   context. The returned title, body and tag open in the normal note editor for review, and nothing
   is saved until Zane confirms. Drafts about current procedures or other time-sensitive facts are
   prompted to stay general where uncertain and point to the official source.
+- A note can be starred as **Important** from the list or viewer (`public.notes.important`). Important
+  notes sort above the rest and have a dedicated filter, so the list surfaces what matters first.
 - Ask Zen-I can also act: commands like "I paid 100 in jollibee using my cash", "bought groceries 250
-  with bdo", "grab 220", "juan owes me 500", "settle the juan debt" or "add 500 to gcash" are parsed
-  (on-device first, Gemini fallback when AI is on) into a single whitelisted action — log or change a
-  transaction, budget, plan entry, note, course lesson, project, account balance or debt. Logging is
-  phrased the way people actually talk: the amount can sit anywhere in the sentence, the store is the
-  merchant, and the funding source after using/with/from/in becomes the account (kept as free text
-  when it isn't a saved one). Bare shorthand like "grab 220" or "coffee 50" logs only when the words
-  clearly read as spending (a ₱/pesos marker or a known merchant), so questions are never mistaken
-  for commands. Every write shows a confirmation card with the exact change before it runs, and
-  deletes are flagged as irreversible. Targets for edits and deletes are matched against rows already
-  in memory, so record titles and ids are never sent to Gemini (account names are sent so an account
-  can be recognised in the phrasing).
-- "Plan with AI" is a shared capability, not a Learning-only feature: one sheet with a General or
-  Study scope (the scope toggle appears only when a course exists), a horizon of Today / This week /
-  Next 7 days, and an optional goal. Study scope falls back to a deterministic local plan when AI is
-  off or unavailable; General scope prompts to turn AI on instead. Proposals are always previewed as
+  with bdo", "grab 220", "juan owes me 500", "I paid Juan 500 from GCash" or "add 500 to gcash" are
+  parsed (on-device first, Gemini fallback when AI is on) into a single whitelisted action — log or
+  change a transaction, budget, plan entry, note, course lesson, project, account balance or debt.
+  Debt payments reduce or settle an existing IOU and move the chosen account balance; they are not
+  logged as income or spending, and a missing amount or account is asked for instead of guessed.
+  The manual "Settle" action in Money remains a status-only toggle; account-aware payments happen
+  through Ask Zen-I. Logging is phrased the way people actually talk: the amount can sit anywhere
+  in the sentence, the store is the merchant, and the funding source after using/with/from/in
+  becomes the account (kept as free text when it isn't a saved one). Bare shorthand like "grab 220"
+  or "coffee 50" logs only when the words clearly read as spending (a ₱/pesos marker or a known merchant), so questions are never
+  mistaken for commands. Every write shows a confirmation card with the exact change before it runs,
+  and deletes are flagged as irreversible. Targets for edits and deletes are matched against rows
+  already in memory, so record titles and ids are never sent to Gemini (account names are sent so an
+  account can be recognised in the phrasing).
+- "Plan with AI" lives in Planner and Ask Zen-I: one sheet with a General or Study scope (the
+  scope toggle appears only when a course exists), a horizon of Today / This week / Next 7 days,
+  and an optional goal. Study scope falls back to a deterministic local plan when AI is off or
+  unavailable; General scope prompts to turn AI on instead. Proposals are always previewed as
   a checkbox list ("Add N of M") before anything is written, and one generation is one AI request.
 - Learning is one feature among notes, finances and planning — not a separate learning platform.
   A course is a container of **modules**, and a module holds ordered **lessons** (title plus
@@ -114,22 +119,34 @@ not truthfully copy this cross-record grounding.
   restarts), sessions link to a course and capture a takeaway, today's Study-tagged planner blocks
   are startable from Learning, courses carry a weekly hour target, and saving a takeaway also
   writes a Study-tagged note.
+- Planner separates everyday tasks from the day plan with a Tasks / Day plan switch. Tapping a
+  calendar date opens that day's plan directly, so there is no separate Upcoming list. Past days
+  stay reviewable; new plan entries and task due dates must be today or later. Tasks or day-plan
+  entries can be marked priority, which pins tasks above other open work and highlights either row
+  with an amber Priority badge and left rail.
 - Money tracks the accounts Zane actually uses, by hand: GCash, BDO, cash or another, each drawn as
   a card showing its live balance and this month's tagged income (`public.accounts`). There is no
   bank linking or API of any kind. A balance is **derived**, never stored as the truth: an opening
   balance plus the signed amounts of the transactions tagged to that account, so "spent 100 on
   jollibee using gcash" subtracts from GCash automatically. Adding or taking out money is a manual
   adjustment to that opening balance and is deliberately *not* logged as income or spending;
-  "Set balance" reconciles the two when they drift. Transactions carry a nullable `account_id`, and
-  deleting an account only detaches its transactions.
+  "Set balance" reconciles the two when they drift. New accounts and per-card colors are managed in
+  Settings; Money keeps the cards for balances and adjustments. Transactions carry a nullable
+  `account_id`, and deleting an account only detaches its transactions.
 - Debts are first-class and deliberately simple: a counterparty, an amount, one direction (they owe
-  Zane, or Zane owes them), an optional note and due date, then settle or delete — no partial
-  payments, no interest, no net-worth maths (`public.debts`). They live on the Money screen only,
-  with settled rows collapsed; Ask Zen-I can log and settle them.
+  Zane, or Zane owes them), an optional note and due date, then settle or delete — no interest and
+  no net-worth maths (`public.debts`). A settlement can be full or partial and moves the chosen
+  account balance. Settled debts stay visible inline under the open ones; Ask Zen-I can log and
+  settle them.
+- Budgets sit directly below the finance score, not behind an activity tab. Activity holds Recent
+  and Debts, can be hidden as a whole, and Recent transactions scroll inside a fixed-height card
+  instead of stretching the screen. The budget card states the current month's end and the full
+  days left, so the window always follows the calendar month rather than the creation date.
 - Money shows a weekly finance score: a 0-100 rolling four-week check-in built from savings rate
   (30), budget adherence (30), debt pressure (20) and cash buffer (20). It is derived live and
-  never stored. The Money card breaks down all four components and an eight-week trend; Dashboard
-  shows a compact version. When AI is on, an optional Gemini explanation uses only the score
+  never stored. The Money card breaks down all four components and an eight-week trend. Dashboard
+  merges the score into the Spending vs income card as a compact ring above Today, showing only
+  the score and verdict. When AI is on, an optional Gemini explanation uses only the score
   aggregates - never individual transactions, merchant names or hidden balances.
 - A per-device "Hide balances" switch (Money header and Settings) masks account balances, the total
   in accounts, per-card income and debt amounts as ₱•••••• — for over-the-shoulder viewing, not

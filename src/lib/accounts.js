@@ -103,6 +103,34 @@ export function debtTotals(debts) {
   return { owedToMe, iOwe }
 }
 
+export function roundMoney(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
+}
+
+/**
+ * Validate one payment against an open debt. The caller decides where to write the
+ * result; this helper only states the remaining balance, whether the debt is settled,
+ * and the signed change to the account holding the money.
+ */
+export function settlementFor(debt, amount) {
+  const payment = Number(amount)
+  if (!Number.isFinite(payment) || payment <= 0) return { ok: false, code: 'amount' }
+  if (!debt || debt.settled) return { ok: false, code: 'closed' }
+  const outstanding = roundMoney(debt.amount)
+  if (!Number.isFinite(outstanding) || outstanding <= 0) return { ok: false, code: 'closed' }
+  const paid = roundMoney(payment)
+  const remaining = roundMoney(outstanding - paid)
+  if (remaining < 0) return { ok: false, code: 'overpay', outstanding }
+  return {
+    ok: true,
+    payment: paid,
+    outstanding,
+    remaining,
+    settled: remaining === 0,
+    delta: debt.direction === 'i_owe' ? -paid : paid,
+  }
+}
+
 /** A short due-date label, flagging anything already past. */
 export function debtDueLabel(debt, ref = new Date()) {
   if (!debt?.due_date) return null

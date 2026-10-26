@@ -1,34 +1,11 @@
 import { CaretLeft } from '../../icons.js'
 import { useRouter } from 'expo-router'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
+import IconButton from '../ui/IconButton.jsx'
 
-export function IconButton({ icon: Icon, onPress, accessibilityLabel, style }) {
-  const { c, radius } = useTheme()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      hitSlop={2}
-      android_ripple={{ color: c.overline, borderless: true }}
-      style={({ pressed }) => [
-        {
-          width: 44,
-          height: 44,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: radius.pill,
-          opacity: pressed ? 0.7 : 1,
-        },
-        style,
-      ]}
-    >
-      <Icon size={22} weight="bold" color={c.foreground} />
-    </Pressable>
-  )
-}
+export { IconButton }
 
 export default function Screen({
   title,

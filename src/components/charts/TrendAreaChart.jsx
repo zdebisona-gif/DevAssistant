@@ -1,7 +1,8 @@
 import { area, curveMonotoneX, line } from 'd3-shape'
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, {
+  Circle,
   Defs,
   G,
   Line,
@@ -10,24 +11,41 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg'
+import { CaretDown } from '../../icons.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 const HEIGHT = 200
-const PAD = { top: 12, right: 10, bottom: 24, left: 46 }
+const PAD = { top: 16, right: 16, bottom: 26, left: 48 }
+const AXIS_SIZE = 10
+
+const trimZero = (value) => String(Number(value.toFixed(2)))
+
+function compactMoney(value) {
+  if (value >= 1000000) return `₱${trimZero(value / 1000000)}M`
+  if (value >= 1000) return `₱${trimZero(value / 1000)}k`
+  return `₱${Math.round(value).toLocaleString()}`
+}
+
+function axisMax(value) {
+  if (value <= 0) return 100
+  if (value < 1000) return Math.ceil(value / 100) * 100
+  if (value < 100000) return Math.ceil(value / 1000) * 1000
+  return Math.ceil(value / 10000) * 10000
+}
 
 export function ChartLegend() {
-  const { c, fonts } = useTheme()
+  const { c, fonts, text } = useTheme()
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <View style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: c.chart1 }} />
-        <Text style={{ fontFamily: fonts.sans, fontSize: 12, color: c.mutedForeground }}>
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
           Spend
         </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: c.chart2 }} />
-        <Text style={{ fontFamily: fonts.sans, fontSize: 12, color: c.mutedForeground }}>
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
           Income
         </Text>
       </View>
@@ -36,19 +54,20 @@ export function ChartLegend() {
 }
 
 export default function TrendAreaChart({ data, tableCaption = 'Monthly income and spend' }) {
-  const { c, fonts } = useTheme()
+  const { c, fonts, text } = useTheme()
   const [width, setWidth] = useState(0)
   const [tableOpen, setTableOpen] = useState(false)
 
-  const avgSpend = Math.round(data.reduce((sum, d) => sum + d.spend, 0) / data.length)
-  const avgIncome = Math.round(data.reduce((sum, d) => sum + d.income, 0) / data.length)
+  const count = data.length || 1
+  const avgSpend = Math.round(data.reduce((sum, d) => sum + d.spend, 0) / count)
+  const avgIncome = Math.round(data.reduce((sum, d) => sum + d.income, 0) / count)
 
-  const maxVal = Math.max(...data.map((d) => Math.max(d.spend, d.income)), 1)
-  const niceMax = Math.ceil(maxVal / 1000) * 1000
+  const maxVal = Math.max(...data.map((d) => Math.max(d.spend, d.income)), 0)
+  const niceMax = axisMax(maxVal)
 
   const innerW = Math.max(width - PAD.left - PAD.right, 0)
   const innerH = HEIGHT - PAD.top - PAD.bottom
-  const x = (i) => PAD.left + (data.length <= 1 ? 0 : (i / (data.length - 1)) * innerW)
+  const x = (i) => PAD.left + (data.length <= 1 ? innerW / 2 : (i / (data.length - 1)) * innerW)
   const y = (v) => PAD.top + innerH - (v / niceMax) * innerH
 
   const areaPath =
@@ -67,8 +86,11 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
           .curve(curveMonotoneX)(data)
       : ''
 
-  const gridValues = [0, niceMax / 2, niceMax]
-  const showEvery = data.length > 7 ? 2 : 1
+  const gridValues = [niceMax, niceMax / 2, 0]
+  const labelEvery = data.length > 7 ? 2 : 1
+  const showLabel = (i) => (data.length - 1 - i) % labelEvery === 0
+  const last = data.length ? data[data.length - 1] : null
+  const lastX = data.length ? x(data.length - 1) : 0
 
   return (
     <View>
@@ -100,13 +122,14 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
                     strokeWidth={1}
                   />
                   <SvgText
-                    x={PAD.left - 6}
-                    y={y(value) + 4}
-                    fontSize={10}
+                    x={PAD.left - 8}
+                    y={y(value) + 3.5}
+                    fontFamily={fonts.mono}
+                    fontSize={AXIS_SIZE}
                     fill={c.mutedForeground}
                     textAnchor="end"
                   >
-                    ₱{(value / 1000).toFixed(1)}k
+                    {compactMoney(value)}
                   </SvgText>
                 </G>
               ))}
@@ -127,13 +150,35 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
               strokeDasharray="6 3"
             />
 
+            {last && last.spend > 0 ? (
+              <Circle
+                cx={lastX}
+                cy={y(last.spend)}
+                r={3.5}
+                fill={c.chart1}
+                stroke={c.card}
+                strokeWidth={2}
+              />
+            ) : null}
+            {last && last.income > 0 ? (
+              <Circle
+                cx={lastX}
+                cy={y(last.income)}
+                r={3.5}
+                fill={c.chart2}
+                stroke={c.card}
+                strokeWidth={2}
+              />
+            ) : null}
+
             {data.map((row, i) =>
-              i % showEvery === 0 ? (
+              showLabel(i) ? (
                 <SvgText
                   key={row.month}
                   x={x(i)}
-                  y={HEIGHT - 6}
-                  fontSize={10}
+                  y={HEIGHT - 8}
+                  fontFamily={fonts.sans}
+                  fontSize={AXIS_SIZE}
                   fill={c.mutedForeground}
                   textAnchor="middle"
                 >
@@ -147,9 +192,9 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
 
       <Text
         style={{
-          marginTop: 8,
+          marginTop: 12,
           fontFamily: fonts.sans,
-          fontSize: 11,
+          fontSize: text.caption,
           color: c.mutedForeground,
         }}
       >
@@ -162,13 +207,33 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
 
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ expanded: tableOpen }}
+        accessibilityHint={
+          tableOpen
+            ? 'Hides the monthly income and spend table'
+            : 'Shows the monthly income and spend table'
+        }
         onPress={() => setTableOpen((open) => !open)}
-        hitSlop={8}
-        style={{ marginTop: 12, minHeight: 44, justifyContent: 'center' }}
+        hitSlop={2}
+        style={({ pressed }) => ({
+          marginTop: 12,
+          minHeight: 48,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          paddingTop: 16,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.line,
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
-        <Text style={{ fontFamily: fonts.sansMedium, fontSize: 12, color: c.primaryFg }}>
+        <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
           {tableOpen ? 'Hide data table' : 'View data table'}
         </Text>
+        <View style={{ transform: [{ rotate: tableOpen ? '180deg' : '0deg' }] }}>
+          <CaretDown size={14} weight="bold" color={c.primaryFg} />
+        </View>
       </Pressable>
 
       {tableOpen ? (
@@ -181,7 +246,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
               paddingBottom: 6,
             }}
           >
-            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 11, color: c.mutedForeground }}>
+            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.micro, color: c.mutedForeground }}>
               Month
             </Text>
             <Text
@@ -189,7 +254,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
                 width: 90,
                 textAlign: 'right',
                 fontFamily: fonts.sansMedium,
-                fontSize: 11,
+                fontSize: text.micro,
                 color: c.mutedForeground,
               }}
             >
@@ -200,7 +265,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
                 width: 90,
                 textAlign: 'right',
                 fontFamily: fonts.sansMedium,
-                fontSize: 11,
+                fontSize: text.micro,
                 color: c.mutedForeground,
               }}
             >
@@ -217,7 +282,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
                 paddingVertical: 6,
               }}
             >
-              <Text style={{ flex: 1, fontFamily: fonts.sans, fontSize: 12, color: c.foreground }}>
+              <Text style={{ flex: 1, fontFamily: fonts.sans, fontSize: text.caption, color: c.foreground }}>
                 {row.month}
               </Text>
               <Text
@@ -225,7 +290,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
                   width: 90,
                   textAlign: 'right',
                   fontFamily: fonts.mono,
-                  fontSize: 12,
+                  fontSize: text.caption,
                   color: c.body,
                   fontVariant: ['tabular-nums'],
                 }}
@@ -237,7 +302,7 @@ export default function TrendAreaChart({ data, tableCaption = 'Monthly income an
                   width: 90,
                   textAlign: 'right',
                   fontFamily: fonts.mono,
-                  fontSize: 12,
+                  fontSize: text.caption,
                   color: c.body,
                   fontVariant: ['tabular-nums'],
                 }}

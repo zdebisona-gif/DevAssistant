@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
-import { ChartLineUp, Sparkle } from '../../icons.js'
+import { memo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { CaretDown, ChartLineUp, Sparkle } from '../../icons.js'
 import Button from '../ui/Button.jsx'
 import { Card } from '../ui/Card.jsx'
 import { useAiPrefs } from '../../data/aiPrefs.jsx'
@@ -165,10 +165,11 @@ function EmptyState({ result }) {
   )
 }
 
-export default function FinanceScoreCard({
+function FinanceScoreCard({
   result,
   history = [],
   compact = false,
+  expandable = false,
   privacy = {},
   onPress,
 }) {
@@ -177,6 +178,7 @@ export default function FinanceScoreCard({
   const [explanation, setExplanation] = useState(null)
   const [explainBusy, setExplainBusy] = useState(false)
   const [explainError, setExplainError] = useState(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   if (!result || result.score === null) {
     return compact ? null : <EmptyState result={result} />
@@ -209,6 +211,51 @@ export default function FinanceScoreCard({
       setExplainBusy(false)
     }
   }
+
+  const aiBlock = (
+    <View style={{ gap: 16 }}>
+      {visibleExplanation ? (
+        <View
+          style={{
+            borderLeftWidth: 2,
+            borderLeftColor: c.accent,
+            paddingLeft: 10,
+            gap: 6,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Sparkle size={13} weight="bold" color={c.accent} />
+            <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+              AI · Gemini
+            </Text>
+          </View>
+          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 19, color: c.body }}>
+            {visibleExplanation}
+          </Text>
+        </View>
+      ) : null}
+
+      {visibleError ? (
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructiveText }}>
+          {visibleError}
+        </Text>
+      ) : null}
+
+      {canExplain ? (
+        <Button variant="secondary" size="sm" icon={Sparkle} onPress={generateExplanation} loading={explainBusy}>
+          {visibleExplanation ? 'Explain again' : 'Explain with Gemini'}
+        </Button>
+      ) : aiEnabled ? (
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+          Gemini is cooling down after its free limit. You can try again shortly.
+        </Text>
+      ) : (
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
+          Turn on AI in Settings for a Gemini explanation.
+        </Text>
+      )}
+    </View>
+  )
 
   if (compact) {
     return (
@@ -262,6 +309,115 @@ export default function FinanceScoreCard({
           </View>
         </Card>
       </Pressable>
+    )
+  }
+
+  if (expandable) {
+    return (
+      <Card padded>
+        <View style={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <View style={{ flexShrink: 1, gap: 3 }}>
+              <Text
+                style={{
+                  fontFamily: fonts.sansMedium,
+                  fontSize: text.micro,
+                  letterSpacing: 0.6,
+                  textTransform: 'uppercase',
+                  color: c.mutedForeground,
+                }}
+              >
+                Finance score
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                <Text
+                  style={{
+                    fontFamily: fonts.monoSemiBold,
+                    fontSize: text.title,
+                    color: c.foreground,
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {result.score}
+                </Text>
+                <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+                  /100
+                </Text>
+                <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: labelTone.color }}>
+                  {result.label}
+                  {result.provisional ? ' (provisional)' : ''}
+                </Text>
+              </View>
+              <Text style={{ fontFamily: fonts.sans, fontSize: text.micro, color: deltaTone(delta, c) }}>
+                {change || 'Rolling four-week check-in'}
+              </Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 3 }}>
+              <ChartLineUp size={18} color={c.mutedForeground} />
+              <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
+                {result.weekLabel}
+              </Text>
+            </View>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={detailsOpen ? 'Hide finance score details' : 'Show finance score details'}
+            accessibilityState={{ expanded: detailsOpen }}
+            onPress={() => setDetailsOpen((open) => !open)}
+            style={({ pressed }) => ({
+              minHeight: 48,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              paddingTop: 16,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.line,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Text
+              style={{
+                fontFamily: fonts.sansMedium,
+                fontSize: text.caption,
+                lineHeight: 16,
+                includeFontPadding: false,
+                color: c.primaryFg,
+              }}
+            >
+              {detailsOpen ? 'Hide details' : 'Details'}
+            </Text>
+            <CaretDown
+              size={16}
+              weight="bold"
+              color={c.mutedForeground}
+              style={{ transform: [{ rotate: detailsOpen ? '180deg' : '0deg' }] }}
+            />
+          </Pressable>
+
+          {detailsOpen ? (
+            <View style={{ gap: 16, paddingTop: 8 }}>
+              <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 19, color: c.body }}>
+                {result.summary}
+              </Text>
+
+              <View style={{ gap: 12 }}>
+                {result.components.map((component) => (
+                  <ScoreBar
+                    key={component.key}
+                    component={component}
+                    detail={privacyDetail(component, privacy)}
+                  />
+                ))}
+              </View>
+
+              <Trend history={history} />
+              {aiBlock}
+            </View>
+          ) : null}
+        </View>
+      </Card>
     )
   }
 
@@ -348,47 +504,10 @@ export default function FinanceScoreCard({
 
         <Trend history={history} />
 
-        {visibleExplanation ? (
-          <View
-            style={{
-              borderLeftWidth: 2,
-              borderLeftColor: c.accent,
-              paddingLeft: 10,
-              gap: 6,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Sparkle size={13} weight="bold" color={c.accent} />
-              <Text style={{ fontFamily: fonts.mono, fontSize: text.micro, color: c.mutedForeground }}>
-                AI · Gemini
-              </Text>
-            </View>
-            <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 19, color: c.body }}>
-              {visibleExplanation}
-            </Text>
-          </View>
-        ) : null}
-
-        {visibleError ? (
-          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.destructiveText }}>
-            {visibleError}
-          </Text>
-        ) : null}
-
-        {canExplain ? (
-          <Button variant="secondary" size="sm" icon={Sparkle} onPress={generateExplanation} loading={explainBusy}>
-            {visibleExplanation ? 'Explain again' : 'Explain with Gemini'}
-          </Button>
-        ) : aiEnabled ? (
-          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-            Gemini is cooling down after its free limit. You can try again shortly.
-          </Text>
-        ) : (
-          <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-            Turn on AI in Settings for a Gemini explanation.
-          </Text>
-        )}
+        {aiBlock}
       </View>
     </Card>
   )
 }
+
+export default memo(FinanceScoreCard)

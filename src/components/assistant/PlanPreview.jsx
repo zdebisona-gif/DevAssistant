@@ -25,7 +25,7 @@ export default function PlanPreview({ items, selected, onToggle }) {
             accessibilityState={{ checked }}
             accessibilityLabel={item.title}
             onPress={() => onToggle(item.key)}
-            style={{
+            style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 12,
@@ -35,7 +35,8 @@ export default function PlanPreview({ items, selected, onToggle }) {
               backgroundColor: checked ? c.primarySoft : c.card,
               paddingHorizontal: 12,
               paddingVertical: 12,
-            }}
+              opacity: pressed ? 0.8 : 1,
+            })}
           >
             <View
               style={{

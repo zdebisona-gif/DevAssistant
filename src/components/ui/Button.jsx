@@ -45,7 +45,7 @@ export default function Button({
       accessibilityLabel={accessibilityLabel}
       disabled={isDisabled}
       onPress={handlePress}
-      android_ripple={isDisabled ? undefined : { color: c.overline, borderless: false }}
+      hitSlop={size === 'sm' ? 4 : undefined}
       style={({ pressed }) => [
         {
           flexDirection: 'row',

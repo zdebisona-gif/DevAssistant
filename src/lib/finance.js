@@ -419,3 +419,119 @@ export function financeScoreContext(result, options = {}) {
 
   return lines.join('\n').slice(0, 4000)
 }
+
+export function totalsAllTime(transactions = []) {
+  let income = 0
+  let spend = 0
+  for (const tx of transactions) {
+    const amount = Number(tx.amount) || 0
+    if (amount >= 0) income += amount
+    else spend += Math.abs(amount)
+  }
+  return { income, spend, net: income - spend }
+}
+
+function daysBetween(startISO, endISO) {
+  if (!startISO || !endISO) return null
+  const start = parseISO(startISO)
+  const end = parseISO(endISO)
+  const diff = Math.floor((end - start) / (1000 * 60 * 60 * 24))
+  return diff
+}
+
+export function goalProgress(goal, transactions = [], ref = new Date()) {
+  if (!goal) return null
+  const target = Number(goal.target_amount) || 0
+  const dueISO = goal.due_date
+  const { net } = totalsAllTime(transactions)
+  const currentSaved = net > 0 ? net : 0
+  const progress = target > 0 ? Math.min(1, currentSaved / target) : 0
+  const remaining = Math.max(0, target - currentSaved)
+  const todayISO = isoDay(ref)
+  const daysTotal = daysBetween(todayISO, dueISO)
+  const daysRemaining = daysTotal == null ? null : daysTotal
+
+  const cadence = goal?.target_cadence || 'monthly'
+  const isShortTerm = daysRemaining != null && daysRemaining >= 0 && daysRemaining <= 30
+  let monthsRemaining = null
+  if (daysRemaining != null && daysRemaining > 30) {
+    monthsRemaining = daysRemaining / 30.44
+  } else if (daysRemaining != null && daysRemaining === 0) {
+    monthsRemaining = 0
+  }
+  const requiredMonthly = !isShortTerm && monthsRemaining && monthsRemaining > 0 ? remaining / monthsRemaining : null
+  const requiredDaily = daysRemaining != null && daysRemaining > 0 ? remaining / daysRemaining : null
+  const requiredWeekly = daysRemaining != null && daysRemaining > 0 ? (remaining / daysRemaining) * 7 : null
+
+  let onTrack = null
+  if (target <= 0) {
+    onTrack = null
+  } else if (currentSaved >= target) {
+    onTrack = true
+  } else if (daysRemaining != null && daysRemaining <= 0) {
+    onTrack = false
+  } else {
+    const window = rollingWindow(ref)
+    const recent = totalsInRange(transactions, window.start, window.end)
+    const recentNet = recent.income - recent.spend
+    if (cadence === 'daily' && daysRemaining > 0 && requiredDaily && requiredDaily > 0) {
+      const recentNetPerDay = recentNet > 0 ? recentNet / WINDOW_DAYS : 0
+      onTrack = recentNetPerDay >= requiredDaily * 0.9
+    } else if (cadence === 'weekly' && daysRemaining > 0 && requiredWeekly && requiredWeekly > 0) {
+      const recentNetPerWeek = recentNet > 0 ? (recentNet / WINDOW_DAYS) * 7 : 0
+      onTrack = recentNetPerWeek >= requiredWeekly * 0.9
+    } else if (cadence === 'monthly' && requiredMonthly && requiredMonthly > 0) {
+      const recentNetPerMonth = recentNet > 0 ? recentNet * (30 / WINDOW_DAYS) : 0
+      onTrack = recentNetPerMonth >= requiredMonthly * 0.9
+    } else if (daysRemaining > 0 && requiredDaily && requiredDaily > 0 && isShortTerm) {
+      const recentNetPerDay = recentNet > 0 ? recentNet / WINDOW_DAYS : 0
+      onTrack = recentNetPerDay >= requiredDaily * 0.9
+    } else if (requiredMonthly && requiredMonthly > 0) {
+      const recentNetPerMonth = recentNet > 0 ? recentNet * (30 / WINDOW_DAYS) : 0
+      onTrack = recentNetPerMonth >= requiredMonthly * 0.9
+    } else {
+      onTrack = null
+    }
+  }
+
+  const guidance = []
+  if (currentSaved >= target) {
+    guidance.push('Target reached!')
+  } else if (onTrack === false) {
+    if (cadence === 'daily' && requiredDaily && requiredDaily > 0) {
+      guidance.push(daysRemaining === 1 ? `Need to save ~${Math.ceil(requiredDaily)} today.` : `Need to save ~${Math.ceil(requiredDaily)} per day.`)
+    } else if (cadence === 'weekly' && requiredWeekly && requiredWeekly > 0) {
+      guidance.push(`Need to save ~${Math.ceil(requiredWeekly)} per week.`)
+    } else if (cadence === 'monthly' && requiredMonthly && requiredMonthly > 0) {
+      guidance.push(`Need to save ~${Math.ceil(requiredMonthly)} per month to reach your target by ${dueISO}.`)
+    } else if (requiredDaily && requiredDaily > 0 && daysRemaining <= 7) {
+      guidance.push(`Need to save ~${Math.ceil(requiredDaily)} per day.`)
+    } else if (requiredWeekly && requiredWeekly > 0 && daysRemaining <= 60) {
+      guidance.push(`Need to save ~${Math.ceil(requiredWeekly)} per week.`)
+    } else if (requiredMonthly && requiredMonthly > 0) {
+      guidance.push(`Need to save ~${Math.ceil(requiredMonthly)} per month to reach your target by ${dueISO}.`)
+    } else if (requiredDaily && requiredDaily > 0) {
+      guidance.push(`Need to save ~${Math.ceil(requiredDaily)} per day.`)
+    }
+  } else if (onTrack === true && currentSaved < target) {
+    guidance.push('On track based on your recent savings rate.')
+  }
+
+  return {
+    goal,
+    target,
+    currentSaved,
+    progress,
+    progressPct: Math.round(progress * 100),
+    remaining,
+    dueISO,
+    todayISO,
+    daysRemaining,
+    monthsRemaining,
+    requiredMonthly,
+    requiredDaily,
+    requiredWeekly,
+    onTrack,
+    guidance,
+  }
+}

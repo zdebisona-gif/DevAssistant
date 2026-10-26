@@ -6,26 +6,28 @@ import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 export default function ErrorState({ error, onRetry }) {
   const { c, fonts, text } = useTheme()
-  const message = error?.message || 'Something went wrong while reaching your data.'
+  const detail = __DEV__ ? error?.message : null
   return (
     <View>
       <EmptyState
         icon={WarningCircle}
         title="Couldn't load your data"
-        description={message}
+        description="Check your connection and try again. Your records are safe."
         action={<Button variant="secondary" size="sm" onPress={onRetry}>Try again</Button>}
       />
-      <Text
-        style={{
-          marginTop: 4,
-          textAlign: 'center',
-          fontFamily: fonts.mono,
-          fontSize: text.micro,
-          color: c.mutedForeground,
-        }}
-      >
-        Check your connection and Supabase keys
-      </Text>
+      {detail ? (
+        <Text
+          style={{
+            marginTop: 4,
+            textAlign: 'center',
+            fontFamily: fonts.mono,
+            fontSize: text.micro,
+            color: c.mutedForeground,
+          }}
+        >
+          {detail}
+        </Text>
+      ) : null}
     </View>
   )
 }

@@ -13,13 +13,20 @@ export default function Section({ title, action, children, style }) {
         <View
           style={{
             flexDirection: 'row',
-            alignItems: 'baseline',
+            alignItems: 'center',
             justifyContent: 'space-between',
             gap: 12,
           }}
         >
           {title ? (
-            <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: text.heading, color: c.foreground }}>
+            <Text
+              style={{
+                flexShrink: 1,
+                fontFamily: fonts.sansSemiBold,
+                fontSize: text.heading,
+                color: c.foreground,
+              }}
+            >
               {title}
             </Text>
           ) : (

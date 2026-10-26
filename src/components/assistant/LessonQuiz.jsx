@@ -101,7 +101,7 @@ export default function LessonQuiz({ visible, course, module, lesson, onClose })
                         accessibilityLabel={choice}
                         disabled={done}
                         onPress={() => setAnswers((prev) => ({ ...prev, [index]: choiceIndex }))}
-                        style={{
+                        style={({ pressed }) => ({
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 10,
@@ -111,7 +111,8 @@ export default function LessonQuiz({ visible, course, module, lesson, onClose })
                           backgroundColor: c.card,
                           paddingHorizontal: 12,
                           paddingVertical: 12,
-                        }}
+                          opacity: pressed ? 0.8 : 1,
+                        })}
                       >
                         {showState ? (
                           isCorrect ? (

@@ -100,11 +100,16 @@ export function budgetProgress(budgets, transactions, ref = new Date()) {
       (spentByCategory.get(tx.category) || 0) + Math.abs(amount),
     )
   }
+  const monthEnd = new Date(ref.getFullYear(), ref.getMonth() + 1, 0)
+  const endsOn = toISODate(monthEnd)
+  const daysLeft = Math.max(0, monthEnd.getDate() - ref.getDate())
   return current.map((b) => ({
     id: b.id,
     category: b.category,
     limit: Number(b.limit_amount) || 0,
     spent: spentByCategory.get(b.category) || 0,
+    endsOn,
+    daysLeft,
   }))
 }
 
@@ -219,6 +224,21 @@ export function entriesOn(entries, dateISO) {
   return entries
     .filter((e) => e.entry_date === dateISO)
     .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+}
+
+/** A plan is missed once its day, or its start time today, has passed unchecked. */
+export function isPlanEntryMissed(entry, ref = new Date()) {
+  if (!entry?.entry_date || entry.done) return false
+  const today = toISODate(ref)
+  if (entry.entry_date < today) return true
+  if (entry.entry_date > today || !entry.start_time) return false
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(entry.start_time))
+  if (!match) return false
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return false
+  const now = ref.getHours() * 60 + ref.getMinutes()
+  return now > hours * 60 + minutes
 }
 
 export function upcomingEntries(entries, ref = new Date(), limit = 4) {

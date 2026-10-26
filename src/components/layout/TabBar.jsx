@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ACTION_COLUMN, ASK_ACTION, TAB_ITEMS } from '../../data/nav.js'
+import { useReducedMotion } from '../../lib/useReducedMotion.js'
 import { useTheme } from '../../theme/ThemeProvider.jsx'
 
 const BAR_HEIGHT = 62
@@ -17,25 +18,32 @@ function columnFor(index) {
   return index < ACTION_COLUMN ? index : index + 1
 }
 
-export default function TabBar({ state, navigation }) {
+export default function TabBar({ state, emitter, navigateToTab }) {
   const { c, fonts, radius, motion, shadow } = useTheme()
   const insets = useSafeAreaInsets()
   const router = useRouter()
+  const reduced = useReducedMotion()
   const [width, setWidth] = useState(0)
 
   const columns = TAB_ITEMS.length + 1
   const slot = width / columns
 
   const [slide] = useState(() => new Animated.Value(columnFor(state.index)))
+  const pillOffset = useMemo(() => Animated.multiply(slide, slot), [slide, slot])
 
   useEffect(() => {
+    if (reduced) {
+      slide.setValue(columnFor(state.index))
+      return
+    }
+
     Animated.timing(slide, {
       toValue: columnFor(state.index),
       duration: motion.base,
       easing: Easing.bezier(0.22, 0, 0, 1),
       useNativeDriver: true,
     }).start()
-  }, [state.index, slide, motion.base])
+  }, [state.index, slide, motion.base, reduced])
 
   const ask = () => {
     Haptics.selectionAsync().catch(() => {})
@@ -67,15 +75,15 @@ export default function TabBar({ state, navigation }) {
               height: PILL_HEIGHT,
               borderRadius: radius.pill,
               backgroundColor: c.primarySoft,
-              transform: [{ translateX: Animated.multiply(slide, slot) }],
+              transform: [{ translateX: pillOffset }],
             }}
           />
         ) : null}
 
         {TAB_ITEMS.flatMap((item, index) => {
-          const focused = state.index === index
+          const route = state.routes.find((candidate) => candidate.name === item.route)
+          const focused = route?.key === state.routes[state.index]?.key
           const tint = focused ? c.foreground : c.mutedForeground
-          const route = state.routes[index]
           const tab = (
             <Pressable
               key={item.route}
@@ -84,13 +92,14 @@ export default function TabBar({ state, navigation }) {
               accessibilityLabel={item.label}
               android_ripple={{ color: c.overline, borderless: true }}
               onPress={() => {
+                if (!route) return
                 Haptics.selectionAsync().catch(() => {})
-                const event = navigation.emit({
+                const event = emitter.emit({
                   type: 'tabPress',
-                  target: route?.key,
+                  target: route.key,
                   canPreventDefault: true,
                 })
-                if (!focused && !event.defaultPrevented) navigation.navigate(item.route)
+                if (!focused && !event.defaultPrevented) navigateToTab(route.key)
               }}
               style={{
                 flex: 1,
@@ -119,7 +128,6 @@ export default function TabBar({ state, navigation }) {
             ? [<View key="action-slot" style={{ flex: 1 }} />, tab]
             : [tab]
         })}
-
 
         {width > 0 ? (
           <Pressable

@@ -1,48 +1,28 @@
 import { useState } from 'react'
+import Constants from 'expo-constants'
 import * as Haptics from 'expo-haptics'
 import { useRouter } from 'expo-router'
-import { CaretRight, Database, Info, LockKey, SignOut, Sparkle, Trash } from '../icons.js'
-import { Alert, Pressable, Switch, Text, View } from 'react-native'
+import { Database, Info, LockKey, SignOut, Sparkle, Trash } from '../icons.js'
+import { Alert, Platform, Pressable, Text, View } from 'react-native'
+import AccountForm from '../components/forms/AccountForm.jsx'
 import ChangePasswordForm from '../components/forms/ChangePasswordForm.jsx'
 import DeleteDataForm from '../components/forms/DeleteDataForm.jsx'
 import Screen from '../components/layout/Screen.jsx'
 import { Card, CardBody, CardHeader } from '../components/ui/Card.jsx'
+import Collapse from '../components/ui/Collapse.jsx'
+import SettingsRow from '../components/ui/SettingsRow.jsx'
+import SwitchRow from '../components/ui/SwitchRow.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
 import { useData } from '../data/store.jsx'
 import { useAuth } from '../data/auth.jsx'
 import { remainingToday, useAiPrefs } from '../data/aiPrefs.jsx'
 import { usePrivacy } from '../data/privacy.jsx'
+import { useReminders } from '../data/reminders.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
 import { reportError } from '../lib/alerts.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
-function Row({ label, value, onPress, right }) {
-  const { c, fonts, text } = useTheme()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        backgroundColor: pressed ? c.overline : 'transparent',
-      })}
-    >
-      <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: text.body, color: c.foreground }}>
-        {label}
-      </Text>
-      {value ? (
-        <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-          {value}
-        </Text>
-      ) : null}
-      {right ?? <CaretRight size={14} weight="bold" color={c.mutedForeground} />}
-    </Pressable>
-  )
-}
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0'
 
 function CountRow({ label, count }) {
   const { c, fonts, text } = useTheme()
@@ -72,12 +52,15 @@ export default function Settings() {
   const { reset } = useOnboarding()
   const { enabled: aiEnabled, setEnabled: setAiEnabled, usage } = useAiPrefs()
   const { hidden, setHidden, accountsHidden, setAccountsHidden } = usePrivacy()
+  const { enabled: remindersEnabled, permission: reminderPermission } = useReminders()
   const router = useRouter()
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [passwordChanged, setPasswordChanged] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [dataDeleted, setDataDeleted] = useState(false)
   const [countsOpen, setCountsOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [accountRecord, setAccountRecord] = useState(null)
 
   const remaining = remainingToday(usage)
   const cap = usage?.cap ?? 50
@@ -85,6 +68,14 @@ export default function Settings() {
     remaining === null
       ? 'No AI requests yet today'
       : `AI usage: ${Math.max(0, cap - remaining)}/${cap} today`
+  const reminderLabel =
+    reminderPermission === 'denied'
+      ? 'Blocked'
+      : reminderPermission === 'unavailable'
+        ? 'Unavailable'
+        : remindersEnabled
+          ? 'On'
+          : 'Off'
 
   const replay = async () => {
     Haptics.selectionAsync().catch(() => {})
@@ -104,6 +95,18 @@ export default function Settings() {
     setDeleteOpen(true)
   }
 
+  const openNewAccount = () => {
+    Haptics.selectionAsync().catch(() => {})
+    setAccountRecord(null)
+    setAccountOpen(true)
+  }
+
+  const openEditAccount = (account) => {
+    Haptics.selectionAsync().catch(() => {})
+    setAccountRecord(account)
+    setAccountOpen(true)
+  }
+
   const confirmSignOut = () => {
     Haptics.selectionAsync().catch(() => {})
     Alert.alert('Sign out?', 'You will need to sign in again to see your records.', [
@@ -119,7 +122,7 @@ export default function Settings() {
   }
 
   return (
-    <Screen title="Settings" subtitle="Account, appearance, intro and data" left="back" tabbed={false}>
+    <Screen title="Settings" subtitle="Account, money, appearance and data" left="back" tabbed={false}>
       <Card>
         <CardHeader title="Account" subtitle="This device stays signed in" />
         <CardBody style={{ gap: 10 }}>
@@ -144,108 +147,109 @@ export default function Settings() {
             </Text>
           ) : null}
         </CardBody>
-        <Row label="Change password" onPress={openPassword} />
-        <Row
+        <SettingsRow label="Change password" onPress={openPassword} />
+        <SettingsRow
           label="Sign out"
           onPress={confirmSignOut}
+          destructive
           right={<SignOut size={14} weight="bold" color={c.destructiveText} />}
         />
       </Card>
 
       <Card>
         <CardHeader title="Appearance" subtitle="Light or dark" />
-        <Row
-          label="Theme"
-          value={undefined}
-          onPress={undefined}
-          right={<ThemeToggle />}
-        />
+        <SettingsRow label="Theme" right={<ThemeToggle />} />
       </Card>
 
       <Card>
+        <CardHeader
+          title="Money accounts"
+          subtitle="Bank, e-wallet and cash"
+          action={
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add money account"
+              onPress={openNewAccount}
+              hitSlop={4}
+              style={({ pressed }) => ({
+                minHeight: 48,
+                justifyContent: 'center',
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
+                Add
+              </Text>
+            </Pressable>
+          }
+        />
+        {data.accounts.length ? (
+          data.accounts.map((account) => (
+            <SettingsRow
+              key={account.id}
+              label={account.name}
+              onPress={() => openEditAccount(account)}
+            />
+          ))
+        ) : (
+          <CardBody>
+            <Text
+              style={{
+                fontFamily: fonts.sans,
+                fontSize: text.micro,
+                lineHeight: 17,
+                color: c.mutedForeground,
+              }}
+            >
+              Add GCash, BDO or cash to tag spending and track balances. Card colors are set
+              per account.
+            </Text>
+          </CardBody>
+        )}
+      </Card>
+
+      {Platform.OS !== 'web' ? (
+        <Card>
+          <CardHeader title="Reminders" subtitle="Local notifications on this device" />
+          <SettingsRow
+            label="Reminders"
+            value={reminderLabel}
+            onPress={() => router.push('/reminders')}
+          />
+        </Card>
+      ) : null}
+
+      <Card>
         <CardHeader title="Privacy" subtitle="Balances on screen" />
-        <Row
+        <SwitchRow
           label="Hide balances"
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {})
-            setHidden(!hidden)
-          }}
-          right={
-            <Switch
-              value={hidden}
-              onValueChange={(next) => {
-                Haptics.selectionAsync().catch(() => {})
-                setHidden(next)
-              }}
-              trackColor={{ false: c.border, true: c.primary }}
-              thumbColor={c.card}
-            />
-          }
+          description="Masks account balances, the accounts total and debt amounts."
+          value={hidden}
+          onValueChange={setHidden}
         />
-        <Row
+        <SwitchRow
           label="Hide account balances only"
-          onPress={
-            hidden
-              ? null
-              : () => {
-                  Haptics.selectionAsync().catch(() => {})
-                  setAccountsHidden(!accountsHidden)
-                }
-          }
-          right={
-            <Switch
-              value={accountsHidden}
-              disabled={hidden}
-              onValueChange={(next) => {
-                Haptics.selectionAsync().catch(() => {})
-                setAccountsHidden(next)
-              }}
-              trackColor={{ false: c.border, true: c.primary }}
-              thumbColor={c.card}
-            />
-          }
+          description="Masks account cards and the accounts total. Ignored while Hide balances is on."
+          value={accountsHidden}
+          onValueChange={setAccountsHidden}
+          disabled={hidden}
         />
-        <CardBody style={{ gap: 8 }}>
+        <CardBody>
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
           >
-            Hide balances masks account balances, the total in your accounts and debt amounts as ₱••••••.
-            Spending, budgets and transaction amounts stay visible.
-          </Text>
-          <Text
-            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
-          >
-            Hide account balances only masks account cards and the accounts total. Debts and spending
-            stay visible. Hide balances overrides it while on.
-          </Text>
-          <Text
-            style={{ fontFamily: fonts.sans, fontSize: text.micro, lineHeight: 17, color: c.mutedForeground }}
-          >
-            Hidden account balances are left out of the context Zen-I sends to Gemini. Both settings
-            are per device.
+            Both settings are per device. Hidden balances are left out of the context sent to Gemini.
           </Text>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader title="AI features" subtitle="Optional · off by default" />
-        <Row
+        <SwitchRow
           label="Gemini answers"
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {})
-            setAiEnabled(!aiEnabled)
-          }}
-          right={
-            <Switch
-              value={aiEnabled}
-              onValueChange={(next) => {
-                Haptics.selectionAsync().catch(() => {})
-                setAiEnabled(next)
-              }}
-              trackColor={{ false: c.border, true: c.primary }}
-              thumbColor={c.card}
-            />
-          }
+          description="Sends only the numbers needed for an explanation or answer."
+          value={aiEnabled}
+          onValueChange={setAiEnabled}
         />
         <CardBody style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -272,7 +276,7 @@ export default function Settings() {
 
       <Card>
         <CardHeader title="Getting started" subtitle="Replay the walkthrough" />
-        <Row label="Replay intro" onPress={replay} />
+        <SettingsRow label="Replay intro" onPress={replay} />
       </Card>
 
       <Card>
@@ -280,7 +284,17 @@ export default function Settings() {
           title="Data"
           subtitle={loading ? 'Syncing…' : error ? 'Couldn’t refresh' : 'Live from your account'}
           action={
-            <Pressable accessibilityRole="button" onPress={() => reload()} hitSlop={16}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Refresh records"
+              onPress={() => reload()}
+              hitSlop={4}
+              style={({ pressed }) => ({
+                minHeight: 48,
+                justifyContent: 'center',
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
               <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primaryFg }}>
                 Refresh
               </Text>
@@ -309,14 +323,16 @@ export default function Settings() {
           ) : null}
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Record counts"
             accessibilityState={{ expanded: countsOpen }}
             onPress={() => setCountsOpen((value) => !value)}
-            style={{
-              minHeight: 44,
+            style={({ pressed }) => ({
+              minHeight: 48,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-            }}
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
             <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
               Record counts
@@ -325,8 +341,8 @@ export default function Settings() {
               {countsOpen ? 'Hide' : 'Show'}
             </Text>
           </Pressable>
-          {countsOpen ? (
-            <View style={{ gap: 8 }}>
+          <Collapse open={countsOpen}>
+            <View style={{ gap: 8, paddingTop: 8 }}>
               <CountRow label="Notes" count={data.notes.length} />
               <CountRow label="Transactions" count={data.transactions.length} />
               <CountRow label="Accounts" count={data.accounts.length} />
@@ -341,7 +357,7 @@ export default function Settings() {
               <CountRow label="Projects" count={data.projects.length} />
               <CountRow label="Penalties" count={data.penalties.length} />
             </View>
-          ) : null}
+          </Collapse>
           <Text
             style={{ fontFamily: fonts.sans, fontSize: text.caption, lineHeight: 18, color: c.mutedForeground }}
           >
@@ -371,9 +387,10 @@ export default function Settings() {
             </Text>
           )}
         </CardBody>
-        <Row
+        <SettingsRow
           label="Delete all data"
           onPress={openDelete}
+          destructive
           right={<Trash size={14} weight="bold" color={c.destructiveText} />}
         />
       </Card>
@@ -384,7 +401,7 @@ export default function Settings() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Info size={14} weight="bold" color={c.mutedForeground} />
             <Text style={{ fontFamily: fonts.sans, fontSize: text.caption, color: c.mutedForeground }}>
-              Build 1.0.0
+              Build {APP_VERSION}
             </Text>
           </View>
           <Text
@@ -395,6 +412,12 @@ export default function Settings() {
           </Text>
         </CardBody>
       </Card>
+
+      <AccountForm
+        visible={accountOpen}
+        record={accountRecord}
+        onClose={() => setAccountOpen(false)}
+      />
 
       <ChangePasswordForm
         visible={passwordOpen}

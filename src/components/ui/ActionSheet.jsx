@@ -24,7 +24,6 @@ export default function ActionSheet({ visible, onClose, title, subtitle, actions
                 onClose()
                 action.onPress?.()
               }}
-              android_ripple={{ color: c.overline, borderless: false }}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',

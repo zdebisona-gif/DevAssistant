@@ -15,6 +15,7 @@ import Screen from '../components/layout/Screen.jsx'
 import { Card } from '../components/ui/Card.jsx'
 import { useData } from '../data/store.jsx'
 import { confirmDelete, reportError } from '../lib/alerts.js'
+import { courseWeekHours } from '../lib/analytics.js'
 import { courseTree } from '../lib/learning.js'
 import { useRowActions } from '../lib/rowActions.jsx'
 import { useTheme } from '../theme/ThemeProvider.jsx'
@@ -38,7 +39,14 @@ function LessonRow({ lesson, current, index, onOpen, onMenu }) {
         accessibilityRole="button"
         accessibilityLabel={`${lesson.title}${lesson.done ? ', completed' : current ? ', current lesson' : ''}`}
         onPress={onOpen}
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 2 }}
+        style={({ pressed }) => ({
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingVertical: 2,
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
         <View
           style={{
@@ -234,15 +242,35 @@ export default function Course() {
     />
   )
 
+  const weeklyTarget = Number(course.weekly_target_hours) || 0
+  const weeklyLogged = courseWeekHours(data.sessions, course.id)
+  const weeklyPct =
+    weeklyTarget > 0 ? Math.min(100, Math.round((weeklyLogged / weeklyTarget) * 100)) : 0
+
   return (
     <Screen
       title={tree.name}
-      subtitle={tree.description || 'Course'}
+      subtitle={tree.detail}
       left="back"
       tabbed={false}
       right={courseMenuButton}
     >
-      <ProgressBar label={tree.detail} value={tree.pct} percentOnly />
+      {tree.description ? (
+        <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 21, color: c.body }}>
+          {tree.description}
+        </Text>
+      ) : null}
+
+      <View style={{ gap: 12 }}>
+        <ProgressBar label="Course progress" value={tree.pct} percentOnly />
+        {weeklyTarget > 0 ? (
+          <ProgressBar
+            label={`This week · ${weeklyLogged}h of ${weeklyTarget}h`}
+            value={weeklyPct}
+            percentOnly
+          />
+        ) : null}
+      </View>
 
       {tree.modules.map((module) => (
         <View key={module.id} style={{ gap: 10 }}>
@@ -253,6 +281,20 @@ export default function Course() {
             >
               {module.title}
             </Text>
+            {module.lessons.length ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                accessibilityLabel={`Add lesson to ${module.title}`}
+                onPress={() => {
+                  setLessonModule(module)
+                  setLessonRecord(null)
+                  setLessonOpen(true)
+                }}
+              >
+                Add
+              </Button>
+            ) : null}
             <RowMenuButton
               compact
               accessibilityLabel={`${module.title}, module options`}

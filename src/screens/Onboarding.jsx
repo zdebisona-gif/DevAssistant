@@ -9,13 +9,16 @@ import {
   SquaresFour,
   Target,
 } from '../icons.js'
-import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Logo from '../components/layout/Logo.jsx'
 import Button from '../components/ui/Button.jsx'
 import { useOnboarding } from '../lib/onboarding.js'
+import { useReducedMotion } from '../lib/useReducedMotion.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
+
+const EASE = Easing.bezier(0.22, 0, 0, 1)
 
 function ContextVisual() {
   const { c, fonts, radius, text } = useTheme()
@@ -193,7 +196,7 @@ const STEPS = [
   {
     icon: SquaresFour,
     title: 'Everything in one place',
-    body: 'Notes, spending, plans, projects and learning progress in a single place — not scattered across five apps.',
+    body: 'Notes, spending, plans, projects and learning progress in one place — not scattered across separate apps.',
     Visual: ContextVisual,
   },
   {
@@ -213,14 +216,62 @@ const STEPS = [
 export default function Onboarding() {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
+  const { fontScale } = useWindowDimensions()
   const { complete } = useOnboarding()
   const router = useRouter()
+  const reduced = useReducedMotion()
+  const stackActions = fontScale > 1.4
   const [index, setIndex] = useState(0)
+  const [motion] = useState(() => new Animated.Value(0))
+  const [dotValues] = useState(() => STEPS.map((_, i) => new Animated.Value(i === 0 ? 1 : 0)))
 
   const step = STEPS[index]
   const isLast = index === STEPS.length - 1
   const Icon = step.icon
   const Visual = step.Visual
+
+  const opacity = motion.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [0, 1, 0],
+  })
+  const translateX = motion.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: [-12, 0, 12],
+  })
+
+  const goTo = (next) => {
+    const clamped = Math.max(0, Math.min(STEPS.length - 1, next))
+    if (clamped === index) return
+    if (!reduced) motion.setValue(clamped > index ? 1 : -1)
+    setIndex(clamped)
+  }
+
+  useEffect(() => {
+    if (reduced) {
+      motion.setValue(0)
+      dotValues.forEach((value, i) => value.setValue(i === index ? 1 : 0))
+      return
+    }
+
+    const animation = Animated.parallel([
+      Animated.timing(motion, {
+        toValue: 0,
+        duration: 220,
+        easing: EASE,
+        useNativeDriver: true,
+      }),
+      ...dotValues.map((value, i) =>
+        Animated.timing(value, {
+          toValue: i === index ? 1 : 0,
+          duration: 220,
+          easing: EASE,
+          useNativeDriver: false,
+        }),
+      ),
+    ])
+    animation.start()
+    return () => animation.stop()
+  }, [index, reduced, motion, dotValues])
 
   const finish = async () => {
     await complete()
@@ -233,14 +284,25 @@ export default function Onboarding() {
         style={{
           paddingTop: insets.top + 6,
           paddingBottom: 10,
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}
       >
         <Logo />
-        <Pressable accessibilityRole="button" onPress={finish} hitSlop={16}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding"
+          onPress={finish}
+          hitSlop={16}
+          style={({ pressed }) => ({
+            minHeight: 48,
+            justifyContent: 'center',
+            paddingHorizontal: 4,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
           <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.label, color: c.mutedForeground }}>
             Skip
           </Text>
@@ -248,73 +310,83 @@ export default function Onboarding() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 24, flexGrow: 1 }}
+        contentContainerStyle={{ padding: 16, gap: 24, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ gap: 10 }}>
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: radius.md,
-              backgroundColor: c.primarySoft,
-            }}
-          >
-            <Icon size={22} weight="duotone" color={c.primaryFg} />
+        <Animated.View style={{ gap: 24, opacity, transform: [{ translateX }] }}>
+          <View style={{ gap: 10 }}>
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: radius.md,
+                backgroundColor: c.primarySoft,
+              }}
+            >
+              <Icon size={22} weight="duotone" color={c.primaryFg} />
+            </View>
+            <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.title, color: c.foreground }}>
+              {step.title}
+            </Text>
+            <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 21, color: c.mutedForeground }}>
+              {step.body}
+            </Text>
           </View>
-          <Text style={{ fontFamily: fonts.monoSemiBold, fontSize: text.title, color: c.foreground }}>
-            {step.title}
-          </Text>
-          <Text style={{ fontFamily: fonts.sans, fontSize: text.body, lineHeight: 21, color: c.mutedForeground }}>
-            {step.body}
-          </Text>
-        </View>
 
-        <Visual />
+          <Visual />
+        </Animated.View>
       </ScrollView>
 
       <View
         style={{
-          paddingHorizontal: 20,
-          paddingBottom: Math.max(insets.bottom, 12),
-          gap: 12,
+          paddingHorizontal: 16,
+          paddingBottom: Math.max(insets.bottom, 16),
+          gap: 10,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
+          style={{ minHeight: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          accessible
+          accessibilityLabel={`Step ${index + 1} of ${STEPS.length}`}
+        >
+          {STEPS.map((item, i) => (
+            <Animated.View
+              key={item.title}
+              style={{
+                height: 6,
+                width: dotValues[i].interpolate({ inputRange: [0, 1], outputRange: [6, 22] }),
+                borderRadius: 999,
+                backgroundColor: i === index ? c.primary : c.muted,
+              }}
+            />
+          ))}
+        </View>
+
+        <View
+          style={{
+            flexDirection: stackActions ? 'column' : 'row',
+            alignItems: stackActions ? 'stretch' : 'center',
+            gap: 10,
+          }}
+        >
           <Button
             variant="secondary"
             icon={ArrowLeft}
             disabled={index === 0}
-            onPress={() => setIndex((i) => Math.max(0, i - 1))}
+            onPress={() => goTo(index - 1)}
             accessibilityLabel="Back"
+            style={stackActions ? { width: '100%' } : { flex: 1 }}
           >
             Back
           </Button>
 
-          <View
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-            accessible
-            accessibilityLabel={`Step ${index + 1} of ${STEPS.length}`}
-          >
-            {STEPS.map((item, i) => (
-              <View
-                key={item.title}
-                style={{
-                  height: 6,
-                  width: i === index ? 22 : 6,
-                  borderRadius: 999,
-                  backgroundColor: i === index ? c.primary : c.muted,
-                }}
-              />
-            ))}
-          </View>
-
           <Button
             variant="primary"
             icon={isLast ? undefined : ArrowRight}
-            onPress={() => (isLast ? finish() : setIndex((i) => i + 1))}
+            onPress={() => (isLast ? finish() : goTo(index + 1))}
+            style={stackActions ? { width: '100%' } : { flex: 1.6 }}
           >
             {isLast ? 'Get started' : 'Next'}
           </Button>
