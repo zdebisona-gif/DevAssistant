@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router'
-import { CaretDown, PaperPlaneRight, Sparkle } from '../icons.js'
+import { CaretDown, PaperPlaneRight, Sparkle, SquaresFour } from '../icons.js'
 import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
@@ -20,6 +20,7 @@ import { useReducedMotion } from '../lib/useReducedMotion.js'
 import Screen from '../components/layout/Screen.jsx'
 import ActionConfirm from '../components/assistant/ActionConfirm.jsx'
 import PlanWithAi from '../components/assistant/PlanWithAi.jsx'
+import ShortcutPanel from '../components/assistant/ShortcutPanel.jsx'
 import Button from '../components/ui/Button.jsx'
 import Chip from '../components/ui/Chip.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
@@ -475,6 +476,69 @@ function NewReplyPill({ visible, onPress }) {
   )
 }
 
+const MODES = [
+  { id: 'chat', label: 'Chat', icon: Sparkle },
+  { id: 'shortcut', label: 'Shortcut', icon: SquaresFour },
+]
+
+function ModeToggle({ mode, onChange }) {
+  const { c, fonts, radius, text } = useTheme()
+  return (
+    <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          padding: 3,
+          borderRadius: radius.pill,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: c.border,
+          backgroundColor: c.muted,
+        }}
+      >
+        {MODES.map((entry) => {
+          const active = mode === entry.id
+          const Icon = entry.icon
+          return (
+            <Pressable
+              key={entry.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={entry.id === 'chat' ? 'Chat mode' : 'Shortcut mode'}
+              onPress={() => onChange(entry.id)}
+              style={({ pressed }) => ({
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                minHeight: 36,
+                borderRadius: radius.pill,
+                backgroundColor: active ? c.primary : 'transparent',
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Icon
+                size={13}
+                weight={active ? 'fill' : 'regular'}
+                color={active ? c.onPrimary : c.mutedForeground}
+              />
+              <Text
+                style={{
+                  fontFamily: fonts.sansMedium,
+                  fontSize: text.caption,
+                  color: active ? c.onPrimary : c.mutedForeground,
+                }}
+              >
+                {entry.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
+
 export default function AskAI() {
   const { c, fonts, radius, text } = useTheme()
   const insets = useSafeAreaInsets()
@@ -482,7 +546,11 @@ export default function AskAI() {
   const { data, loading, error, reload } = services
   const { enabled: aiEnabled, recordUsage } = useAiPrefs()
   const { hidden, accountsHidden } = usePrivacy()
-  const { q } = useLocalSearchParams()
+  const { q, mode: modeParam, shortcut: shortcutParam } = useLocalSearchParams()
+  const [mode, setMode] = useState(() => {
+    const asked = Array.isArray(modeParam) ? modeParam[0] : modeParam
+    return asked === 'shortcut' ? 'shortcut' : 'chat'
+  })
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
@@ -494,7 +562,9 @@ export default function AskAI() {
   const [noteFormOpen, setNoteFormOpen] = useState(false)
   const [newReply, setNewReply] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const [keyboardPad, setKeyboardPad] = useState(0)
   const scrollRef = useRef(null)
+  const keyboardAreaRef = useRef(null)
   const handled = useRef(null)
   const atBottom = useRef(true)
   const reduced = useReducedMotion()
@@ -532,11 +602,29 @@ export default function AskAI() {
   }, [])
 
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => {
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
       setKeyboardVisible(true)
+      /* Production Android builds run edge-to-edge, so the window no longer
+         shrinks for the keyboard. Measure how much of the input area is actually
+         covered and lift it by exactly that, which is a no-op when the window
+         already resized (Expo Go). */
+      if (Platform.OS === 'android') {
+        const keyboardTop = Number(event?.endCoordinates?.screenY)
+        if (Number.isFinite(keyboardTop)) {
+          const measure = () => {
+            keyboardAreaRef.current?.measureInWindow((_x, y, _width, height) => {
+              setKeyboardPad(Math.max(0, Math.round(y + height - keyboardTop)))
+            })
+          }
+          requestAnimationFrame(() => requestAnimationFrame(measure))
+        }
+      }
       if (atBottom.current) scrollRef.current?.scrollToEnd({ animated: false })
     })
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false))
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false)
+      setKeyboardPad(0)
+    })
     return () => {
       show.remove()
       hide.remove()
@@ -730,7 +818,7 @@ export default function AskAI() {
       left="back"
       title="Ask Zen-I"
       right={
-        messages.length ? (
+        messages.length && mode === 'chat' ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Clear conversation"
@@ -758,10 +846,25 @@ export default function AskAI() {
           <ErrorState error={error} onRetry={reload} />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <View ref={keyboardAreaRef} style={{ flex: 1 }}>
+          <ModeToggle mode={mode} onChange={setMode} />
+          {mode === 'shortcut' ? (
+            <KeyboardAvoidingView
+              style={{ flex: 1, paddingBottom: Platform.OS === 'android' ? keyboardPad : 0 }}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+              <ShortcutPanel
+                services={services}
+                initialShortcut={shortcutParam}
+                bottomInset={keyboardVisible ? 10 : Math.max(insets.bottom, 10)}
+                onExit={() => setMode('chat')}
+              />
+            </KeyboardAvoidingView>
+          ) : (
+          <KeyboardAvoidingView
+            style={{ flex: 1, paddingBottom: Platform.OS === 'android' ? keyboardPad : 0 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
         <View style={{ flex: 1 }}>
           <ScrollView
             ref={scrollRef}
@@ -928,7 +1031,9 @@ export default function AskAI() {
             />
           </View>
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+          )}
+        </View>
       )}
       <PlanWithAi visible={planOpen} defaultScope={planScope} onClose={() => setPlanOpen(false)} />
       <NoteForm

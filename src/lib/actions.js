@@ -18,6 +18,7 @@ import { courseLessons } from './learning.js'
 import {
   isISODate,
   normalizeTime,
+  parseNonNegative,
   parsePositive,
   validateBudget,
   validateCourse,
@@ -46,6 +47,7 @@ export const ALLOWED_ACTIONS = [
   'delete_lesson',
   'create_project',
   'adjust_account',
+  'create_transfer',
   'add_debt',
   'settle_debt',
   'delete_debt',
@@ -796,6 +798,33 @@ function buildAdjustAccount(args, data) {
   })
 }
 
+/* Moves money between two saved accounts. The write itself stays in the existing
+   transferBetweenAccounts() service; this builder only validates the proposal. */
+function buildCreateTransfer(args, data) {
+  const accounts = accountsFor(data)
+  const from = accounts.find((row) => row.id === args.from_id) || bestAccount(data, args.from)
+  const to = accounts.find((row) => row.id === args.to_id) || bestAccount(data, args.to)
+  if (!from) return fail('Choose the account the money comes from.')
+  if (!to) return fail('Choose the account the money goes to.')
+  if (from.id === to.id) return fail('Choose two different accounts.')
+  const amount = parsePositive(args.amount)
+  if (!amount) return fail('Enter an amount greater than zero.')
+  const fee = args.fee === null || args.fee === undefined || args.fee === '' ? 0 : parseNonNegative(args.fee)
+  if (fee === null) return fail('Enter a valid service fee.')
+  const date = isISODate(args.occurred_on) ? args.occurred_on : todayISO()
+  return ok('create_transfer', 'local', {
+    payload: { from_id: from.id, to_id: to.id, amount, fee, occurred_on: date },
+    summary: `Move ${money(amount)} from ${from.name} to ${to.name}${fee ? `, fee ${money(fee)}` : ''}`,
+    details: [
+      { label: 'From', value: from.name },
+      { label: 'To', value: to.name },
+      { label: 'Amount', value: money(amount) },
+      ...(fee ? [{ label: 'Fee', value: money(fee) }] : []),
+      { label: 'Date', value: formatDateShort(date) },
+    ],
+  })
+}
+
 function buildAddDebt(args) {
   const direction = args.direction === 'i_owe' ? 'i_owe' : 'owed_to_me'
   const counterparty = String(args.counterparty || args.target || '').trim()
@@ -931,15 +960,24 @@ function buildSettleDebt(args, data) {
   const direction =
     args.direction === 'i_owe' || args.direction === 'owed_to_me' ? args.direction : null
   const amount = parsePositive(args.amount)
-  const found = matchOpenDebt(data.debts, {
-    counterparty,
-    direction,
-    amount,
-    text: args.text,
-  })
-  if (!found.ok) return fail(settlementMatchError(found))
+  /* Shortcut mode already knows exactly which row the user picked; passing its id
+     avoids re-guessing from a name when two debts share a counterparty. */
+  let debt = null
+  if (args.debt_id) {
+    debt = (data.debts || []).find((row) => row.id === args.debt_id)
+    if (!debt) return fail('That debt no longer exists. Pick another one.')
+    if (debt.settled) return fail('That debt is already settled.')
+  } else {
+    const found = matchOpenDebt(data.debts, {
+      counterparty,
+      direction,
+      amount,
+      text: args.text,
+    })
+    if (!found.ok) return fail(settlementMatchError(found))
+    debt = found.debt
+  }
 
-  const debt = found.debt
   if (!amount) {
     return fail(
       debt.direction === 'i_owe'
@@ -1016,6 +1054,7 @@ const BUILDERS = {
   delete_lesson: buildDeleteLesson,
   create_project: (args) => buildCreateProject(args),
   adjust_account: buildAdjustAccount,
+  create_transfer: (args, data) => buildCreateTransfer(args, data),
   add_debt: (args) => buildAddDebt(args),
   settle_debt: buildSettleDebt,
   delete_debt: buildDeleteDebt,
@@ -1467,6 +1506,8 @@ export async function runAction(services, proposal) {
       if (mode === 'set') return services.reconcileAccount(proposal.target.id, amount)
       return services.adjustOpeningBalance(proposal.target.id, mode === 'subtract' ? -amount : amount)
     }
+    case 'create_transfer':
+      return services.transferBetweenAccounts(proposal.payload)
     case 'add_debt':
       return services.createDebt(proposal.payload)
     case 'settle_debt':
@@ -1496,6 +1537,7 @@ export const ACTION_LABELS = {
   delete_lesson: 'Delete lesson',
   create_project: 'Add project',
   adjust_account: 'Adjust balance',
+  create_transfer: 'Transfer money',
   add_debt: 'Log debt',
   settle_debt: 'Settle debt',
   delete_debt: 'Delete debt',

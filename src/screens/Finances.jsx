@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import {
   ArrowDownLeft,
+  ArrowRight,
   ArrowUpRight,
   Bank,
   Check,
@@ -30,6 +31,7 @@ import AdjustAccountSheet from '../components/forms/AdjustAccountSheet.jsx'
 import BudgetForm from '../components/forms/BudgetForm.jsx'
 import DebtForm from '../components/forms/DebtForm.jsx'
 import GoalForm from '../components/finance/GoalForm.jsx'
+import TransferForm from '../components/forms/TransferForm.jsx'
 import TxForm from '../components/forms/TxForm.jsx'
 import Screen, { IconButton } from '../components/layout/Screen.jsx'
 import Section from '../components/layout/Section.jsx'
@@ -246,6 +248,7 @@ export default function Finances() {
   const [activityHidden, setActivityHidden] = useState(false)
   const [txOpen, setTxOpen] = useState(false)
   const [txRecord, setTxRecord] = useState(null)
+  const [transferOpen, setTransferOpen] = useState(false)
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [budgetRecord, setBudgetRecord] = useState(null)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -290,6 +293,8 @@ export default function Finances() {
     setBudgetOpen(true)
   }, [])
 
+  const openNewTransfer = useCallback(() => setTransferOpen(true), [])
+
   const openEditAccount = useCallback((account) => {
     setAccountRecord(account)
     setAccountOpen(true)
@@ -318,11 +323,21 @@ export default function Finances() {
         subtitle: 'Choose what to record',
         actions: [
           { key: 'transaction', label: 'Income or expense', icon: Plus, onPress: openNewTx },
+          ...(data.accounts.length > 1
+            ? [
+                {
+                  key: 'transfer',
+                  label: 'Transfer between accounts',
+                  icon: ArrowRight,
+                  onPress: openNewTransfer,
+                },
+              ]
+            : []),
           { key: 'goal', label: 'Financial goal', icon: Plus, onPress: openNewGoal },
           { key: 'debt', label: 'Debt', icon: HandCoins, onPress: () => openNewDebt() },
         ],
       }),
-    [open, openNewTx, openNewGoal, openNewDebt],
+    [data.accounts.length, open, openNewTx, openNewTransfer, openNewGoal, openNewDebt],
   )
 
   const openEditDebt = useCallback((debt) => {
@@ -877,6 +892,7 @@ export default function Finances() {
           setTxRecord(null)
         }}
       />
+      <TransferForm visible={transferOpen} onClose={() => setTransferOpen(false)} />
       <BudgetForm
         visible={budgetOpen}
         record={budgetRecord}

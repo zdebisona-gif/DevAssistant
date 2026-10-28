@@ -10,6 +10,7 @@ import { AppState } from 'react-native'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as db from '../lib/db.js'
 import { roundMoney, settlementFor, taggedNet } from '../lib/accounts.js'
+import { todayISO } from '../lib/analytics.js'
 import { money } from '../lib/format.js'
 import { useAuth } from './auth.jsx'
 
@@ -173,6 +174,35 @@ export function DataProvider({ children }) {
       /* Reconcile: rewrite the opening balance so the live balance equals what the user sees. */
       reconcileAccount: (id, displayed) =>
         mutate(() => db.updateAccount(id, { opening_balance: displayed - taggedNet(data.transactions, id) })),
+      /* A transfer keeps money inside the user's own accounts, so it nudges both opening
+         balances instead of creating income and spending rows. Only a real service fee
+         is written as a transaction, which keeps the month's totals honest. */
+      transferBetweenAccounts: ({ from_id, to_id, amount, fee = 0, occurred_on }) => {
+        const from = data.accounts.find((row) => row.id === from_id)
+        const to = data.accounts.find((row) => row.id === to_id)
+        if (!from || !to) throw new Error('Choose two accounts to transfer between.')
+        if (from.id === to.id) throw new Error('Choose two different accounts.')
+        const moved = roundMoney(amount)
+        const charge = roundMoney(fee)
+        if (!(moved > 0)) throw new Error('Enter an amount greater than zero.')
+        if (!(charge >= 0)) throw new Error('Enter a valid service fee.')
+        const nextFrom = roundMoney((Number(from.opening_balance) || 0) - moved)
+        const nextTo = roundMoney((Number(to.opening_balance) || 0) + moved)
+        return mutate(async () => {
+          await db.updateAccount(from.id, { opening_balance: nextFrom })
+          await db.updateAccount(to.id, { opening_balance: nextTo })
+          if (charge > 0) {
+            await db.addTransaction({
+              merchant: `Transfer fee · ${from.name} → ${to.name}`,
+              amount: -charge,
+              category: 'Other',
+              account: from.name,
+              account_id: from.id,
+              occurred_on: occurred_on || todayISO(),
+            })
+          }
+        })
+      },
       createDebt: (row) => mutate(() => db.addDebt(row)),
       updateDebt: (id, patch) => mutate(() => db.updateDebt(id, patch)),
       deleteDebt: (id) => mutate(() => db.deleteDebt(id)),

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
-import { PaperPlaneRight, Sparkle } from '../../icons.js'
+import { PaperPlaneRight, Sparkle, SquaresFour } from '../../icons.js'
 import { useEffect, useState } from 'react'
-import { Animated, Easing, Keyboard, TextInput, View } from 'react-native'
+import { Animated, Easing, Keyboard, Pressable, Text, TextInput, View } from 'react-native'
 import Svg, { Rect } from 'react-native-svg'
 import { useData } from '../../data/store.jsx'
 import { deriveSuggestions } from '../../lib/ask.js'
@@ -186,6 +186,32 @@ export default function QuickAsk() {
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open shortcut mode"
+          onPress={() => {
+            Keyboard.dismiss()
+            router.push({ pathname: '/ask', params: { mode: 'shortcut' } })
+          }}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            minHeight: 48,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: radius.pill,
+            borderWidth: 1,
+            borderColor: c.primary,
+            backgroundColor: c.primarySoft,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <SquaresFour size={13} weight="bold" color={c.primary} />
+          <Text style={{ fontFamily: fonts.sansMedium, fontSize: text.caption, color: c.primary }}>
+            Shortcuts
+          </Text>
+        </Pressable>
         {suggestions.map((suggestion) => (
           <Chip key={suggestion} onPress={() => submit(suggestion)}>
             {suggestion}

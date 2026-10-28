@@ -1,41 +1,47 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+# Zeni (Expo / React Native)
 
-## Expo has changed — do not trust your training data
+Mobile-first Expo app (SDK 57, Expo Router). Source is JS/JSX, not TypeScript. Runs on Windows.
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
+## Project map (look here first, do not search for these)
+- Routes: `app/` (every file is a screen). Do not use `src/app/`.
+- Money screen: `src/screens/Finances.jsx`. Ask Zen-I screen: `src/screens/AskAI.jsx`. Other screens: `src/screens/`.
+- Data and actions: `src/data/store.jsx`, `src/lib/accounts.js`, `src/lib/db.js`, `src/lib/validation.js`, `src/lib/format.js`, `src/data/constants.js`.
+- Forms: `src/components/forms/` (TxForm, AdjustAccountSheet, TransferForm). UI parts: `src/components/ui/` (Field, Sheet, TagPicker). Layout: `src/components/layout/Screen.jsx`.
+- Icons: `src/icons.js`. Only use icons already exported there. Never search `node_modules` for icons. If one is missing, add a single import line following the existing pattern.
+- Backend: `supabase/`.
+- Import `Link`, `router`, `useLocalSearchParams` from `expo-router`.
 
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+## Save requests (important)
+- Every step costs one request from a small daily limit. Use as few steps as possible.
+- Work only on the files named in the request or in the project map above. Do not explore the repo.
+- Call `read`, `grep`, `glob` and `edit` directly. Do not use the `execute` tool.
+- Run independent tool calls together in the same step.
+- Plan all changes to a file first, then apply them in as few edit calls as possible. Replace a whole contiguous block in one edit instead of making many small edits one after another.
+- If you need most of a file, read it once in full. Do not read it in several chunks.
+- Do not re-read a file after editing it. A successful edit is already confirmed.
+- Large files (`src/lib/actions.js`, `src/lib/ask.js`, `AskAI.jsx`, `Finances.jsx`): read only the relevant section.
+- Make the smallest change that does the task. Do not refactor or reformat unrelated code.
+- When you remove or rename a variable, ref or function, grep once for leftover uses before finishing. A leftover reference crashes the app at runtime.
+- If a command or edit fails once, fix it once. If it fails again, stop and tell me what went wrong.
+- Do not run lint, typecheck, or builds unless I ask.
+- Do not fetch docs or search the web unless an API call fails or you are unsure of a specific function.
+- Bugs that only appear in a production build (they work in Expo Go): you cannot test these. Make one well-reasoned change, tell me exactly what to test, and stop. Do not keep trying variations.
 
-## Commands
+## Shell: Windows PowerShell (not bash)
+- Never use `head`, `tail`, `grep`, `cat`, `sed`, `awk`, or `2>&1 | ...`. They do not exist here.
+- Use `Select-Object -First N`, `Get-Content -Tail N`, `Select-String`, `Get-ChildItem` instead.
+- Do not nest `node -e "..."` inside `powershell -Command "..."`. Write a small `.js` file and run it with `node`.
+- Python, pip, rsvg-convert, ImageMagick and similar tools are NOT installed. Do not check for them. If a task needs one, tell me instead of searching.
+- Use Windows paths (`C:\dev\zeni-mobile\...`).
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
+## Commands (only when needed)
+- Add packages with `npx expo install <package>` (never `npm install`).
+- `npx expo start` to run.
 
-```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
-```
+## Constraints
+- Never create or edit `ios/` or `android/`. Configure native behavior in `app.json` and config plugins.
+- Prefer Expo modules over third-party libraries.
 
-Run lint and typecheck before declaring any task done.
-
-## Navigation & Routing
-
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
-
-## Building with EAS
-
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
-
-## Rules
-
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+## Context files (read only when the task needs them)
+- `DESIGN.md`: UI and visual design tasks only.
+- `PRODUCT.md`: product-decision tasks only.

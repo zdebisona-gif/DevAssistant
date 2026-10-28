@@ -9,7 +9,7 @@ import CheckBox from '../components/ui/CheckBox.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import ErrorState from '../components/ui/ErrorState.jsx'
 import FadeSwap from '../components/ui/FadeSwap.jsx'
-import Loading from '../components/ui/Loading.jsx'
+import Skeleton, { SkeletonGroup } from '../components/ui/Skeleton.jsx'
 import PlanForm from '../components/forms/PlanForm.jsx'
 import TrendAreaChart, { ChartLegend } from '../components/charts/TrendAreaChart.jsx'
 import Screen from '../components/layout/Screen.jsx'
@@ -343,6 +343,122 @@ function DueRow({ project }) {
   )
 }
 
+function SkeletonRow({ leadSize = 34, rows = 3 }) {
+  const { c, radius } = useTheme()
+
+  return (
+    <Card>
+      {Array.from({ length: rows }).map((_, index) => (
+        <View key={index}>
+          {index ? (
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: c.line,
+                marginLeft: 16 + leadSize + 12,
+              }}
+            />
+          ) : null}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+            }}
+          >
+            <Skeleton
+              width={leadSize}
+              height={leadSize}
+              radius={leadSize <= 24 ? radius.sm : radius.pill}
+            />
+            <View style={{ flex: 1, gap: 7 }}>
+              <Skeleton width="62%" height={12} />
+              <Skeleton width="36%" height={9} />
+            </View>
+            <Skeleton width={42} height={10} />
+          </View>
+        </View>
+      ))}
+    </Card>
+  )
+}
+
+function DashboardSkeleton() {
+  const { radius } = useTheme()
+
+  return (
+    <SkeletonGroup
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading your workspace"
+      style={{ gap: 24 }}
+    >
+      <View style={{ gap: 10 }}>
+        <Skeleton height={104} radius={radius.lg} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Skeleton width={132} height={30} radius={radius.pill} />
+          <Skeleton width={104} height={30} radius={radius.pill} />
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 16 }}>
+        {[0, 1].map((key) => (
+          <View key={key} style={{ flex: 1, minWidth: 0, gap: 7 }}>
+            <Skeleton width={58} height={9} />
+            <Skeleton width="82%" height={24} />
+            <Skeleton width="64%" height={10} />
+          </View>
+        ))}
+      </View>
+
+      <View style={{ gap: 12 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <Skeleton width={156} height={15} />
+          <Skeleton width={96} height={30} radius={radius.pill} />
+        </View>
+        <Card padded>
+          <View style={{ gap: 14 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <View style={{ flex: 1, gap: 8, paddingTop: 4 }}>
+                <Skeleton width={112} height={10} />
+                <Skeleton width={82} height={10} />
+              </View>
+              <Skeleton width={54} height={54} radius={radius.pill} />
+            </View>
+            <Skeleton height={132} radius={radius.md} />
+          </View>
+        </Card>
+      </View>
+
+      <View style={{ gap: 12 }}>
+        <Skeleton width={72} height={15} />
+        <SkeletonRow leadSize={22} rows={3} />
+      </View>
+
+      <View style={{ gap: 12 }}>
+        <Skeleton width={56} height={15} />
+        <SkeletonRow rows={3} />
+      </View>
+    </SkeletonGroup>
+  )
+}
+
 export default function Dashboard() {
   const { c, fonts, radius, text } = useTheme()
   const { data, loading, error, reload, togglePlanEntry } = useData()
@@ -399,7 +515,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <Screen title={`${greeting()}, ${USER.name}`} subtitle={dateLabel}>
-        <Loading label="Loading your workspace" />
+        <DashboardSkeleton />
       </Screen>
     )
   }
