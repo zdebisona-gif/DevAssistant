@@ -3,7 +3,28 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 const ENABLED_KEY = 'zeni.ai.enabled'
 const USAGE_KEY = 'zeni.ai.usage'
+const DOMAINS_KEY = 'zeni.ai.domains'
 const AiPrefsContext = createContext(null)
+
+/* Notes default to aggregates so note labels stay on-device until the user opts in. */
+const DEFAULT_DOMAINS = {
+  finance: 'labels',
+  planner: 'labels',
+  learning: 'labels',
+  projects: 'labels',
+  notes: 'aggregates',
+}
+
+const DOMAIN_VALUES = ['off', 'aggregates', 'labels']
+
+function normalizeDomains(raw) {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_DOMAINS }
+  const next = { ...DEFAULT_DOMAINS }
+  for (const [domain, value] of Object.entries(raw)) {
+    if (DOMAIN_VALUES.includes(value)) next[domain] = value
+  }
+  return next
+}
 
 /*
  * Gemini is opt-in and OFF by default. This provider holds the user's choice plus the
@@ -12,15 +33,27 @@ const AiPrefsContext = createContext(null)
 export function AiPrefsProvider({ children }) {
   const [enabled, setEnabledState] = useState(false)
   const [usage, setUsage] = useState(null)
+  const [domains, setDomains] = useState(() => ({ ...DEFAULT_DOMAINS }))
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(ENABLED_KEY), AsyncStorage.getItem(USAGE_KEY)])
-      .then(([rawEnabled, rawUsage]) => {
+    Promise.all([
+      AsyncStorage.getItem(ENABLED_KEY),
+      AsyncStorage.getItem(USAGE_KEY),
+      AsyncStorage.getItem(DOMAINS_KEY),
+    ])
+      .then(([rawEnabled, rawUsage, rawDomains]) => {
         setEnabledState(rawEnabled === '1')
         if (rawUsage) {
           try {
             setUsage(JSON.parse(rawUsage))
+          } catch {
+            /* ignore */
+          }
+        }
+        if (rawDomains) {
+          try {
+            setDomains(normalizeDomains(JSON.parse(rawDomains)))
           } catch {
             /* ignore */
           }
@@ -41,9 +74,23 @@ export function AiPrefsProvider({ children }) {
     AsyncStorage.setItem(USAGE_KEY, JSON.stringify(next)).catch(() => {})
   }, [])
 
+  const setDomainPref = useCallback((domain, value) => {
+    if (!DOMAIN_VALUES.includes(value)) return
+    setDomains((prev) => {
+      const next = { ...prev, [domain]: value }
+      AsyncStorage.setItem(DOMAINS_KEY, JSON.stringify(next)).catch(() => {})
+      return next
+    })
+  }, [])
+
+  const enabledFor = useCallback(
+    (domain) => Boolean(enabled) && domains[domain] !== 'off',
+    [enabled, domains],
+  )
+
   const value = useMemo(
-    () => ({ ready, enabled, setEnabled, usage, recordUsage }),
-    [ready, enabled, setEnabled, usage, recordUsage],
+    () => ({ ready, enabled, setEnabled, usage, recordUsage, domains, setDomainPref, enabledFor }),
+    [ready, enabled, setEnabled, usage, recordUsage, domains, setDomainPref, enabledFor],
   )
 
   return <AiPrefsContext.Provider value={value}>{children}</AiPrefsContext.Provider>

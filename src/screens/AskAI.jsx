@@ -35,14 +35,21 @@ import { answerQuery, deriveSuggestions } from '../lib/ask.js'
 import { buildActionContext, buildExtractedProposal, looksLikeCommand, parseLocalAction, runAction, withCategory } from '../lib/actions.js'
 import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
 import { buildContextFor } from '../lib/context.js'
-import { askGemini, describeGeminiError, extractAction, generateNote, inCooldown } from '../lib/gemini.js'
+import { askGemini, describeGeminiError, extractAction, generateNote, inCooldown, planTools } from '../lib/gemini.js'
 import { classifyIntent } from '../lib/intent.js'
+import { askWithTools } from '../lib/tools/index.js'
 import { extractNotePrompt, NOTE_DRAFT_NOTICE } from '../lib/noteDraft.js'
 import { inferScope, looksLikePlanRequest } from '../lib/planWithAi.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 function fallbackNote(error) {
   return `${describeGeminiError(error)} Showing the on-device answer.`
+}
+
+const GENERIC_ANSWER_PREFIX = 'I can answer from what you have logged:'
+
+function isGenericLocalAnswer(result) {
+  return typeof result?.answer === 'string' && result.answer.startsWith(GENERIC_ANSWER_PREFIX)
 }
 
 function AssistantMessage({ message, onFollowUp }) {
@@ -544,7 +551,7 @@ export default function AskAI() {
   const insets = useSafeAreaInsets()
   const services = useData()
   const { data, loading, error, reload } = services
-  const { enabled: aiEnabled, recordUsage } = useAiPrefs()
+  const { enabled: aiEnabled, recordUsage, domains } = useAiPrefs()
   const { hidden, accountsHidden } = usePrivacy()
   const { q, mode: modeParam, shortcut: shortcutParam } = useLocalSearchParams()
   const [mode, setMode] = useState(() => {
@@ -747,6 +754,55 @@ export default function AskAI() {
     }
 
     const intent = classifyIntent(value)
+
+    /*
+     * Tool path: only where the old flow would have ended in 'clarify', or where the
+     * local engine answered with its generic "what you have logged" fallback.
+     * Any 'none'/'off'/GeminiUnavailable falls through to the existing behavior.
+     */
+    const wantsTools =
+      (intent.kind === 'clarify' || (intent.kind === 'local' && isGenericLocalAnswer(local))) &&
+      aiEnabled &&
+      !inCooldown()
+
+    if (wantsTools) {
+      try {
+        const result = await askWithTools({
+          question: value,
+          ctx: {
+            data,
+            now: new Date(),
+            prefs: { domains },
+            privacy: { hidden, accountsHidden },
+          },
+          deps: { planTools, askGemini },
+        })
+
+        if (result.kind === 'answer') {
+          recordUsage({ remaining: result.remaining, cap: result.cap, model: result.model })
+          reply.answer = result.text
+          reply.label = 'AI · Gemini'
+          reply.sources = result.sources
+          reply.breakdown = []
+          reply.insight = null
+          reply.followUps = []
+          reply.sent = result.sent
+          setMessages((prev) => [...prev, { id: `a${stamp}`, role: 'assistant', ...reply }])
+          setPending(false)
+          return
+        }
+
+        if (result.kind === 'clarify') {
+          reply.answer = result.text
+          reply.label = 'Zen-I'
+          setMessages((prev) => [...prev, { id: `a${stamp}`, role: 'assistant', ...reply }])
+          setPending(false)
+          return
+        }
+      } catch {
+        /* Keep the existing on-device answer and note. */
+      }
+    }
 
     if (intent.kind === 'ai' && aiEnabled && !inCooldown() && !triedAction) {
       try {

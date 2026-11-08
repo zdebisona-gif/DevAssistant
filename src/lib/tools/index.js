@@ -10,6 +10,7 @@ import { guardResult } from './privacy.js'
 import { getTool, manifest, TOOLS, validateArgs } from './registry.js'
 
 export { TOOLS, getTool, manifest, validateArgs } from './registry.js'
+export { askWithTools } from './orchestrator.js'
 export {
   TIER0_KEYS,
   applyHidden,
