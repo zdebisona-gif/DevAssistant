@@ -48,6 +48,7 @@ const BODY_CAP = 2000
 const TOOL_STRING_CAP = 80
 const CLARIFY_CAP = 160
 const MAX_TOOLS = 4
+const MAX_BATCH_ACTIONS = 5
 
 const ENUMS = {
   type: ['expense', 'income'],
@@ -100,6 +101,57 @@ export function sanitizeActionArgs(args) {
   }
 
   return out
+}
+
+/* Actions that remove a record. A batch may contain at most one, and only alone. */
+export const DELETE_ACTIONS = new Set([
+  'delete_transaction',
+  'delete_note',
+  'delete_debt',
+  'delete_planner_event',
+  'delete_lesson',
+])
+
+/**
+ * Validate a model-proposed batch of actions.
+ * Garbage in, empty batch out. Never throws.
+ */
+export function sanitizeActionBatch(raw, allowedActions) {
+  const empty = { actions: [], blocked: '' }
+  if (!isPlainObject(raw)) return empty
+
+  const allowed =
+    allowedActions instanceof Set
+      ? allowedActions
+      : new Set(Array.isArray(allowedActions) ? allowedActions : [])
+
+  const actions = []
+  const list = Array.isArray(raw.actions) ? raw.actions : []
+
+  for (const entry of list) {
+    if (actions.length >= MAX_BATCH_ACTIONS) break
+    if (!isPlainObject(entry)) continue
+
+    const action = cleanString(entry.action, TOOL_STRING_CAP)
+    if (!action) continue
+    /* Bulk deletion is never allowed, whatever the model calls it. */
+    if (action.includes('delete_all')) continue
+    if (action === 'none') continue
+    if (!allowed.has(action)) continue
+
+    actions.push({
+      action,
+      confidence: entry.confidence === 'low' ? 'low' : 'high',
+      args: sanitizeActionArgs(entry.args),
+    })
+  }
+
+  const deletes = actions.filter((entry) => DELETE_ACTIONS.has(entry.action))
+  if (deletes.length > 1 || (deletes.length === 1 && actions.length > 1)) {
+    return { actions: [], blocked: 'delete-must-be-alone' }
+  }
+
+  return { actions, blocked: '' }
 }
 
 /** The only read-only tools the model may select in this stage. */
@@ -178,4 +230,5 @@ export const KNOWN_TASKS = new Set([
   'generate-lesson',
   'generate-quiz',
   'plan-tools',
+  'extract-actions',
 ])

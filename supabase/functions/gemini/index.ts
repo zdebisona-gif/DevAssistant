@@ -22,6 +22,7 @@ import {
   KNOWN_TASKS,
   TOOL_NAMES,
   sanitizeActionArgs,
+  sanitizeActionBatch,
   sanitizeToolPlan,
 } from './validate.js'
 
@@ -148,6 +149,27 @@ const ACTION_SCHEMA = {
   required: ['action', 'confidence'],
 }
 
+/* Reuses the singular arg properties so the two schemas cannot drift. */
+const ACTION_BATCH_SCHEMA = {
+  type: 'object',
+  properties: {
+    actions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: [...ACTIONS] },
+          confidence: { type: 'string', enum: ['high', 'low'] },
+          args: ACTION_SCHEMA.properties.args,
+        },
+        required: ['action', 'confidence'],
+        propertyOrdering: ['action', 'confidence', 'args'],
+      },
+    },
+  },
+  required: ['actions'],
+}
+
 const ACTION_RULES = [
   'You turn one user message into at most one record action for a private personal app.',
   `Allowed actions: ${ACTIONS.join(', ')}.`,
@@ -166,6 +188,8 @@ const ACTION_RULES = [
   'When the user says they paid, repaid, returned or settled money owed to or by someone, use settle_debt, never create_transaction. Put the other person in args.counterparty, the payment amount in args.amount, the saved account name in args.account, and args.direction "owed_to_me" when they paid the user or "i_owe" when the user paid them. If the amount, account or direction is missing, return settle_debt with only the details the user gave; the app asks for the rest. For delete_debt put the person in args.counterparty.',
   'For create_transfer put the source account name in args.from, the destination in args.to, the amount in args.amount, and an optional fee in args.fee; a transfer is never a transaction.',
 ].join(' ')
+
+const ACTION_BATCH_RULES = `${ACTION_RULES} You may return up to 5 actions for one message, in the order the user said them. Return a JSON object with an actions array. Each item has action, confidence and args. Use the same arg names as before. A delete must be returned alone; if the message mixes a delete with other changes, return only the non-delete actions. Return actions [] if the message is a question or not a change request.`
 
 const NOTE_TAGS = ['Work', 'Study', 'Idea', 'Personal'] as const
 
@@ -449,6 +473,7 @@ const BASE_RULES = [
 
 function systemFor(task: string) {
   if (task === 'extract-action') return ACTION_RULES
+  if (task === 'extract-actions') return ACTION_BATCH_RULES
   if (task === 'plan-tools') return TOOL_PLAN_RULES
   if (task === 'generate-note') return NOTE_RULES
   if (task === 'assess-submission') return ASSESS_RULES
@@ -485,6 +510,19 @@ function requestFor(task: string, question: string, context: string) {
         maxOutputTokens: 300,
         responseMimeType: 'application/json',
         responseSchema: ACTION_SCHEMA,
+      },
+    }
+  }
+
+  if (task === 'extract-actions') {
+    return {
+      systemInstruction: { parts: [{ text: ACTION_BATCH_RULES }] },
+      contents: [{ role: 'user', parts: [{ text: `Message: ${question}\n\n${context}` }] }],
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 700,
+        responseMimeType: 'application/json',
+        responseSchema: ACTION_BATCH_SCHEMA,
       },
     }
   }
@@ -708,6 +746,22 @@ Deno.serve(async (req) => {
         confidence: parsed?.confidence === 'low' ? 'low' : 'high',
         args: sanitizeActionArgs(parsed?.args && typeof parsed.args === 'object' ? parsed.args : {}),
       },
+      model: MODEL,
+      remaining: Math.max(0, DAILY_CAP - used),
+      cap: DAILY_CAP,
+    })
+  }
+
+  if (task === 'extract-actions') {
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return fail({ error: 'bad-actions' }, 502)
+    }
+    const batch = sanitizeActionBatch(parsed, ACTIONS)
+    return json({
+      json: { actions: batch.actions, blocked: batch.blocked },
       model: MODEL,
       remaining: Math.max(0, DAILY_CAP - used),
       cap: DAILY_CAP,

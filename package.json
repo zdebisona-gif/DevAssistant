@@ -36,7 +36,7 @@
     "test:ingestion": "node --experimental-default-type=module --test src/ingestion/__tests__/parsers.test.js src/ingestion/__tests__/security.test.js src/ingestion/__tests__/pipeline.test.js",
     "test:finance": "node --experimental-default-type=module --test src/lib/__tests__/finance.test.js",
     "test:sleep": "node --experimental-default-type=module --test src/lib/__tests__/sleepScore.test.js",
-    "test:tools": "node --experimental-default-type=module --test src/lib/tools/__tests__/privacy.test.js src/lib/tools/__tests__/registry.test.js src/lib/tools/__tests__/orchestrator.test.js src/lib/tools/__tests__/routeGate.test.js src/lib/tools/__tests__/history.test.js",
+    "test:tools": "node --experimental-default-type=module --test src/lib/tools/__tests__/privacy.test.js src/lib/tools/__tests__/registry.test.js src/lib/tools/__tests__/orchestrator.test.js src/lib/tools/__tests__/routeGate.test.js src/lib/tools/__tests__/history.test.js src/lib/tools/__tests__/batch.test.js",
     "test:proxy": "node --test supabase/functions/gemini/__tests__/validate.test.js",
     "test:db": "node scripts/test-db.mjs && node scripts/test-db-concurrency.mjs",
     "test:db:sql": "node scripts/test-db.mjs",

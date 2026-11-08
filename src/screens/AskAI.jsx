@@ -38,6 +38,7 @@ import { buildContextFor } from '../lib/context.js'
 import { askGemini, describeGeminiError, extractAction, generateNote, inCooldown, planTools } from '../lib/gemini.js'
 import { classifyIntent } from '../lib/intent.js'
 import { buildHistory } from '../lib/tools/history.js'
+import { NOTE_ROUTE_PATTERN } from '../lib/tools/batch.js'
 import { askWithTools } from '../lib/tools/index.js'
 import { shouldTryTools } from '../lib/tools/routeGate.js'
 import { extractNotePrompt, NOTE_DRAFT_NOTICE } from '../lib/noteDraft.js'
@@ -676,7 +677,9 @@ export default function AskAI() {
     setNewReply(false)
     pushAskHistory(value, history).then(setHistory)
 
-    const notePrompt = extractNotePrompt(value)
+    /* Explicit "make me a note about X" also drafts, even without the exact wording. */
+    const notePrompt =
+      extractNotePrompt(value) || (NOTE_ROUTE_PATTERN.test(value) ? value : '')
     if (notePrompt) {
       if (!aiEnabled) {
         setMessages((prev) => [

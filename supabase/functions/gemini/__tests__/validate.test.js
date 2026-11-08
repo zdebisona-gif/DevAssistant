@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   ACTION_ARG_KEYS,
+  DELETE_ACTIONS,
   KNOWN_TASKS,
   TOOL_NAMES,
   sanitizeActionArgs,
@@ -176,6 +177,7 @@ test('KNOWN_TASKS covers the tasks sent from the screens and the new plan-tools 
     'summarize-note',
     'tutor',
     'extract-action',
+    'extract-actions',
     'generate-plan',
     'assess-submission',
     'assess-sleep',
@@ -190,6 +192,14 @@ test('KNOWN_TASKS covers the tasks sent from the screens and the new plan-tools 
 
   for (const task of expected) {
     assert.ok(KNOWN_TASKS.has(task), `KNOWN_TASKS is missing "${task}"`)
+  }
+})
+
+test('every batch delete rule is a real client action', () => {
+  const source = readFileSync(resolve(ROOT, 'src/lib/actions.js'), 'utf8')
+
+  for (const action of DELETE_ACTIONS) {
+    assert.ok(source.includes(`'${action}'`), `actions.js is missing "${action}"`)
   }
 })
 

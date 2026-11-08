@@ -154,6 +154,33 @@ export async function extractAction({ text, context = '' }) {
 }
 
 /**
+ * Ask the proxy to turn a message into up to five whitelisted actions.
+ * An empty actions array is valid: it means the message was not a change request.
+ * @returns {Promise<{ actions: Array<{ action: string, confidence: 'high'|'low', args: object }>, blocked: string, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function extractActions({ text, context = '' }) {
+  const q = String(text || '').trim()
+  if (!q) throw new GeminiUnavailable('bad-request')
+
+  const data = await invokeProxy({
+    task: 'extract-actions',
+    question: q.slice(0, 500),
+    context: String(context || '').slice(0, 4000),
+  })
+
+  if (!data.json) throw new GeminiUnavailable('empty')
+
+  return {
+    actions: Array.isArray(data.json.actions) ? data.json.actions : [],
+    blocked: data.json.blocked || '',
+    model: data.model,
+    remaining: data.remaining,
+    cap: data.cap,
+  }
+}
+
+/**
  * Ask the proxy to propose plan entries for a horizon.
  * @returns {Promise<{ items: Array<object>, model?: string, remaining?: number, cap?: number }>}
  * @throws {GeminiUnavailable}

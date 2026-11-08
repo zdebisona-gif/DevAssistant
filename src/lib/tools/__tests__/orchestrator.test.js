@@ -1,7 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
+import { runTool as indexRunTool } from '../index.js'
+import { runTool as moduleRunTool } from '../runTool.js'
 import { askWithTools } from '../orchestrator.js'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 const NOW = new Date('2026-11-08T12:00:00')
 
@@ -474,4 +481,13 @@ test('the plan question never exceeds the proxy 500 char cap', async () => {
 
   assert.ok(deps.calls.planArgs.question.length <= 500)
   assert.equal(deps.calls.planArgs.question, 'Who owes me?')
+})
+
+test('runTool has a single definition and the orchestrator imports it', () => {
+  assert.equal(indexRunTool, moduleRunTool)
+
+  const source = readFileSync(resolve(HERE, '../orchestrator.js'), 'utf8')
+  assert.ok(!/function\s+runTool/.test(source), 'orchestrator must not define runTool')
+  assert.ok(!/const\s+runTool/.test(source), 'orchestrator must not alias runTool')
+  assert.match(source, /import \{ runTool \} from '\.\/runTool\.js'/)
 })
