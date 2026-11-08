@@ -6,8 +6,7 @@
 
 import { supabase } from './supabase.js'
 import { NOTE_TAGS } from '../data/constants.js'
-import { formatClock12 } from './format.js'
-import { formatDuration, noteStamp } from './sleep.js'
+import { parseSleepInterpretation } from './sleepInterpretation.js'
 
 const TIMEOUT_MS = 15000
 const COOLDOWN_MS = 10 * 60 * 1000
@@ -207,63 +206,52 @@ export async function assessSubmission({ title, brief, criteria, submission, lin
 }
 
 /**
- * Ask the proxy to assess one day's sleep from its sessions, notes, and recent history.
- * @returns {Promise<{ rating: number, score: number, breakdown: object, feedback: string, model?: string, remaining?: number, cap?: number }>}
+ * Ask Gemini to interpret a night the deterministic engine already scored.
+ * The model never produces the base score; it returns a bounded adjustment and
+ * qualitative output only. A malformed payload falls back to zero adjustment.
+ *
+ * @returns {Promise<{ adjustment: number, flags: string[], patternInsight: string, wakeupCall: string, confidence: 'low'|'medium'|'high', fallback: boolean, model?: string, remaining?: number, cap?: number }>}
  * @throws {GeminiUnavailable}
  */
-export async function assessSleep({ logDate, sessions = [], totalMinutes = 0, notes = [], history = '' }) {
-  const question = `Assess the sleep for ${String(logDate || '').trim()}`.slice(0, 500)
-  const sessionLines = sessions.map((session, index) => {
-    const from = formatClock12(session.from) || session.from
-    const to = formatClock12(session.to) || session.to
-    return `Session ${index + 1}: ${from} to ${to}`
-  })
-  const noteLines = notes.map((note) =>
-    `${noteStamp(note.at)} ${String(note.text || '').trim()}`.trim(),
-  )
+export async function assessSleep({ logDate, modelContext = {}, history = '' }) {
+  const question = `Interpret the sleep for ${String(logDate || '').trim()}`.slice(0, 500)
   const context = [
     `Date: ${String(logDate || '').trim()}`,
-    `Sessions: ${sessionLines.length ? sessionLines.join('; ') : 'none'}`,
-    `Total sleep: ${formatDuration(totalMinutes)} (${Math.round(totalMinutes)} minutes)`,
-    `Today's timestamped notes:\n${noteLines.length ? noteLines.join('\n') : '(no notes)'}`,
-    `Recent history (newest first):\n${String(history || '').trim() || '(no recent history)'}`,
+    `Structured sleep data (already scored in code):`,
+    JSON.stringify(modelContext).slice(0, 2600),
+    `Recent nights (newest first):`,
+    String(history || '').trim().slice(0, 1200) || '(no recent history)',
   ]
     .join('\n')
     .slice(0, 4000)
 
-  const data = await invokeProxy({ task: 'assess-sleep', question, context })
+  let data
+  try {
+    data = await invokeProxy({ task: 'assess-sleep', question, context })
+  } catch (error) {
+    /* A malformed model payload is not a transport failure: the deterministic
+       score stands on its own, so use it without an adjustment. */
+    if (error?.detail === 'bad-sleep-assessment') {
+      return {
+        adjustment: 0,
+        flags: [],
+        patternInsight: '',
+        wakeupCall: '',
+        confidence: 'low',
+        fallback: true,
+      }
+    }
+    throw error
+  }
+
   const result = data.json
-  const rating = Math.round(Number(result?.rating))
-  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-    throw new GeminiUnavailable('empty')
-  }
-
-  const score = Math.round(Number(result?.score))
-  if (!Number.isFinite(score) || score < 0 || score > 100) {
-    throw new GeminiUnavailable('empty')
-  }
-
-  const breakdown = {
-    duration_fit: Math.round(Number(result?.breakdown?.duration_fit) || 0),
-    daytime_energy: Math.round(Number(result?.breakdown?.daytime_energy) || 0),
-    nap_quality: Math.round(Number(result?.breakdown?.nap_quality) || 0),
-    continuity: Math.round(Number(result?.breakdown?.continuity) || 0),
-  }
-
-  const feedback = String(result?.feedback || '').trim()
-  if (!feedback) throw new GeminiUnavailable('empty')
-
-  return {
-    rating,
-    score,
-    breakdown,
-    feedback,
-    model: data.model,
-    remaining: data.remaining,
-    cap: data.cap,
-  }
+  return { ...parseSleepInterpretation(result), model: data.model, remaining: data.remaining, cap: data.cap }
 }
 
+/**
+ * Validate and clamp whatever the model returned. Invalid or malformed values
+ * collapse to the deterministic score with no adjustment.
+ */
 /**
  * Ask the proxy for a plain-text sleep recap.
  * @returns {Promise<{ text: string, model?: string, remaining?: number, cap?: number }>}
@@ -421,4 +409,33 @@ export async function generateQuiz({ course = '', module = '', lesson = '', cont
   if (!questions.length) throw new GeminiUnavailable('empty')
 
   return { questions, model: data.model, remaining: data.remaining, cap: data.cap }
+}
+
+/**
+ * Ask the proxy which read-only tools would answer the question.
+ * An empty tools array is valid: it means no tool was needed.
+ * @returns {Promise<{ tools: Array<{ name: string, args: object }>, clarify: string, model?: string, remaining?: number, cap?: number }>}
+ * @throws {GeminiUnavailable}
+ */
+export async function planTools({ question, enabled = [] }) {
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')}`
+
+  const data = await invokeProxy({
+    task: 'plan-tools',
+    question: String(question || '').slice(0, 500),
+    context: `Today: ${today}\nEnabled: ${(enabled || []).join(',')}`,
+  })
+
+  if (!data.json) throw new GeminiUnavailable('empty')
+
+  return {
+    tools: data.json.tools || [],
+    clarify: data.json.clarify || '',
+    model: data.model,
+    remaining: data.remaining,
+    cap: data.cap,
+  }
 }
