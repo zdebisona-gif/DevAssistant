@@ -38,18 +38,13 @@ import { buildContextFor } from '../lib/context.js'
 import { askGemini, describeGeminiError, extractAction, generateNote, inCooldown, planTools } from '../lib/gemini.js'
 import { classifyIntent } from '../lib/intent.js'
 import { askWithTools } from '../lib/tools/index.js'
+import { shouldTryTools } from '../lib/tools/routeGate.js'
 import { extractNotePrompt, NOTE_DRAFT_NOTICE } from '../lib/noteDraft.js'
 import { inferScope, looksLikePlanRequest } from '../lib/planWithAi.js'
 import { useTheme } from '../theme/ThemeProvider.jsx'
 
 function fallbackNote(error) {
   return `${describeGeminiError(error)} Showing the on-device answer.`
-}
-
-const GENERIC_ANSWER_PREFIX = 'I can answer from what you have logged:'
-
-function isGenericLocalAnswer(result) {
-  return typeof result?.answer === 'string' && result.answer.startsWith(GENERIC_ANSWER_PREFIX)
 }
 
 function AssistantMessage({ message, onFollowUp }) {
@@ -756,14 +751,14 @@ export default function AskAI() {
     const intent = classifyIntent(value)
 
     /*
-     * Tool path: only where the old flow would have ended in 'clarify', or where the
-     * local engine answered with its generic "what you have logged" fallback.
+     * Tool path: a routing gate decides whether this is an open-ended question that the
+     * local engine would answer confidently but wrongly. Crisp lookups stay local.
      * Any 'none'/'off'/GeminiUnavailable falls through to the existing behavior.
      */
     const wantsTools =
-      (intent.kind === 'clarify' || (intent.kind === 'local' && isGenericLocalAnswer(local))) &&
       aiEnabled &&
-      !inCooldown()
+      !inCooldown() &&
+      shouldTryTools(value, local).route === 'tools'
 
     if (wantsTools) {
       try {

@@ -8,9 +8,24 @@
  * The two Gemini calls are injected so this file stays pure and testable.
  */
 
-import { createPseudonymizer } from './privacy.js'
-import { manifest } from './registry.js'
-import { runTool } from './index.js'
+import { createPseudonymizer, guardResult } from './privacy.js'
+import { getTool, manifest, validateArgs } from './registry.js'
+
+/*
+ * Local mirror of index.js runTool. Importing index.js here would create a cycle,
+ * because index.js re-exports this module. Keep the two in sync.
+ */
+function runTool(name, args, ctx) {
+  const tool = getTool(name)
+  if (!tool) return { error: 'unknown_tool' }
+
+  try {
+    const clean = validateArgs(tool, args)
+    return guardResult(tool, tool.run(clean, ctx), ctx)
+  } catch {
+    return { error: 'tool_failed' }
+  }
+}
 
 const MAX_CONTEXT_CHARS = 3500
 const TRUNCATION_NOTE = '\n… (truncated to fit)'
