@@ -41,19 +41,6 @@ function isGeminiUnavailable(error) {
   return error?.name === 'GeminiUnavailable'
 }
 
-/*
- * The proxy builds "Question: ...\n\n<context>", so history has to ride in the
- * question field. It only fits when the whole thing stays under the proxy cap.
- */
-function planQuestion(question, historyText) {
-  const base = String(question || '')
-  if (!historyText) return base.slice(0, MAX_PLAN_QUESTION_CHARS)
-
-  const combined = `${base}\n\nHistory:\n${historyText}`
-  if (combined.length <= MAX_PLAN_QUESTION_CHARS) return combined
-  return base.slice(0, MAX_PLAN_QUESTION_CHARS)
-}
-
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -107,8 +94,12 @@ export async function askWithTools({ question, ctx, deps, history }) {
 
   let plan
   try {
+    /*
+     * The planner only sees the user's own question. Conversation history is
+     * pseudonymized and sent later, with the computed tool results.
+     */
     plan = await deps.planTools({
-      question: planQuestion(question, historyText),
+      question: String(question || '').slice(0, MAX_PLAN_QUESTION_CHARS),
       enabled,
     })
   } catch (error) {

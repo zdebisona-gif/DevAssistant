@@ -372,14 +372,40 @@ test('history is sent under "Conversation so far:" with real names tokenized', a
   assert.match(deps.calls.askArgs.context, /follow-up/)
   assert.equal(deps.calls.askArgs.question, 'what about next month?')
 
-  /* The plan question carries the short history. */
-  assert.match(deps.calls.planArgs.question, /History:/)
-  assert.ok(deps.calls.planArgs.question.length <= 500)
+  /* The planner only sees the original question. */
+  assert.equal(deps.calls.planArgs.question, 'what about next month?')
+  assert.ok(!deps.calls.planArgs.question.includes('Juan'))
+  assert.ok(!deps.calls.planArgs.question.includes('History'))
 
   /* History is re-encoded before it leaves the device. */
   assert.match(result.sent.history, /P1/)
   assert.ok(!result.sent.history.includes('Juan'))
   assert.ok(!JSON.stringify(result.sent).includes('Juan'))
+})
+
+test('history never reaches the planTools question', async () => {
+  const question = 'what about next month?'
+  const deps = capturingDeps({
+    tools: [{ name: 'debts_summary', args: {} }],
+    clarify: '',
+  })
+
+  const result = await askWithTools({
+    question,
+    ctx: makeCtx(),
+    deps,
+    history: 'You: who owes me\nZen-I: Juan owes you 500.',
+  })
+
+  assert.equal(deps.calls.planArgs.question, question)
+  assert.ok(!deps.calls.planArgs.question.includes('Juan'))
+  assert.ok(!deps.calls.planArgs.question.includes('History'))
+  assert.ok(!deps.calls.planArgs.question.includes('who owes me'))
+
+  assert.match(deps.calls.askArgs.context, /^Conversation so far:/)
+  assert.match(deps.calls.askArgs.context, /P1/)
+  assert.ok(!deps.calls.askArgs.context.includes('Juan'))
+  assert.ok(!result.sent.history.includes('Juan'))
 })
 
 test('a long history and large tool results stay under the 3900 char cap', async () => {
