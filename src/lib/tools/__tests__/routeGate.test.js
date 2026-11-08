@@ -95,3 +95,22 @@ test('phrase lists are exported and non-empty', () => {
     assert.ok(Array.isArray(words) && words.length > 0, `${domain} has no words`)
   }
 })
+
+test('a short follow-up after an AI answer goes to tools', () => {
+  const history = { turns: 1, lastWasAi: true }
+  const result = shouldTryTools('I would need 50k', { answer: 'A local answer.' }, { history })
+
+  assert.deepEqual(result, { route: 'tools', reason: 'follow-up' })
+})
+
+test('the same follow-up after a local answer stays local', () => {
+  const history = { turns: 1, lastWasAi: false }
+  const result = shouldTryTools('I would need 50k', { answer: 'A local answer.' }, { history })
+
+  assert.equal(result.route, 'local')
+  assert.equal(result.reason, 'default')
+})
+
+test('without history the gate behaves exactly as before', () => {
+  assert.equal(shouldTryTools('I would need 50k', { answer: 'A local answer.' }).route, 'local')
+})

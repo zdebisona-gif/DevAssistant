@@ -7,21 +7,18 @@
  *
  * Rules are evaluated in order:
  *   1. empty question -> local
- *   2. crisp lookup   -> local (unless it also looks forward-looking or advisory)
- *   3. open-ended     -> tools
- *   4. generic local fallback -> tools
- *   5. otherwise      -> local
+ *   2. follow-up after an AI answer -> tools
+ *   3. crisp lookup   -> local (unless it also looks forward-looking or advisory)
+ *   4. open-ended     -> tools
+ *   5. generic local fallback -> tools
+ *   6. otherwise      -> local
  */
 
-export const GENERIC_FALLBACK_PREFIX = 'I can answer from what you have logged: '
+import { CRISP_LOOKUPS, DOMAIN_WORDS, isFollowUp } from './history.js'
 
-export const CRISP_LOOKUPS = [
-  /\bhow much (?:did|have) i (?:spend|spent|earn|earned|save|saved)\b/i,
-  /\bwhat(?:'s| is) my (?:finance )?(?:balance|budget|score)\b/i,
-  /\bwhat(?:'s| is) on my plan\b/i,
-  /\bwho owes\b/i,
-  /^(?:show|list)\b/i,
-]
+export { CRISP_LOOKUPS, DOMAIN_WORDS }
+
+export const GENERIC_FALLBACK_PREFIX = 'I can answer from what you have logged: '
 
 export const FUTURE_PHRASES = [
   'will i',
@@ -91,49 +88,6 @@ export const ADVICE_PHRASES = [
   'on track',
 ]
 
-export const DOMAIN_WORDS = {
-  money: [
-    'money',
-    'finance',
-    'financial',
-    'financially',
-    'spend',
-    'spending',
-    'spent',
-    'budget',
-    'budgets',
-    'income',
-    'salary',
-    'debt',
-    'debts',
-    'save',
-    'saving',
-    'savings',
-    'afford',
-    'balance',
-    'cash',
-    'cost',
-    'expense',
-    'expenses',
-  ],
-  plan: ['plan', 'schedule', 'planner', 'calendar', 'task', 'tasks', 'event', 'events', 'routine'],
-  study: [
-    'study',
-    'studying',
-    'learn',
-    'learning',
-    'course',
-    'courses',
-    'lesson',
-    'lessons',
-    'quiz',
-    'school',
-    'class',
-    'classes',
-  ],
-  projects: ['project', 'projects', 'deadline', 'deadlines', 'deliverable', 'deliverables'],
-}
-
 function hasWholeWord(text, phrase) {
   const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, 'i').test(text)
@@ -156,9 +110,18 @@ function localTextOf(localReply) {
   return String(localReply?.answer || '')
 }
 
-export function shouldTryTools(question, localReply) {
+export function shouldTryTools(question, localReply, options = {}) {
   const text = String(question || '').trim()
   if (!text) return { route: 'local', reason: 'empty' }
+
+  /*
+   * A short question after an AI answer leans on that answer. After a local answer
+   * it does not, because the local engine had no conversation to lean on.
+   */
+  const history = options?.history
+  if (history?.lastWasAi && isFollowUp(text, history)) {
+    return { route: 'tools', reason: 'follow-up' }
+  }
 
   const forwardLooking = hasAny(text, FUTURE_PHRASES)
   const advisory = hasAny(text, ADVICE_PHRASES)

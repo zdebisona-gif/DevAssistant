@@ -37,6 +37,7 @@ import { loadAskHistory, pushAskHistory } from '../lib/askHistory.js'
 import { buildContextFor } from '../lib/context.js'
 import { askGemini, describeGeminiError, extractAction, generateNote, inCooldown, planTools } from '../lib/gemini.js'
 import { classifyIntent } from '../lib/intent.js'
+import { buildHistory } from '../lib/tools/history.js'
 import { askWithTools } from '../lib/tools/index.js'
 import { shouldTryTools } from '../lib/tools/routeGate.js'
 import { extractNotePrompt, NOTE_DRAFT_NOTICE } from '../lib/noteDraft.js'
@@ -579,6 +580,13 @@ export default function AskAI() {
     setNewReply(false)
   }
 
+  const startNewTopic = () => {
+    if (!messages.length) return
+    setMessages([])
+    setNewReply(false)
+    atBottom.current = true
+  }
+
   const clearConversation = () => {
     if (!messages.length) return
     Alert.alert(
@@ -751,6 +759,14 @@ export default function AskAI() {
     const intent = classifyIntent(value)
 
     /*
+     * Conversation memory comes from the thread on this screen. The question being
+     * answered is not in `messages` yet, so it is never part of its own history.
+     */
+    const thread = buildHistory(messages)
+    const lastAssistant = [...messages].reverse().find((entry) => entry.role === 'assistant')
+    const gateHistory = { ...thread, lastWasAi: lastAssistant?.label === 'AI · Gemini' }
+
+    /*
      * Tool path: a routing gate decides whether this is an open-ended question that the
      * local engine would answer confidently but wrongly. Crisp lookups stay local.
      * Any 'none'/'off'/GeminiUnavailable falls through to the existing behavior.
@@ -758,7 +774,7 @@ export default function AskAI() {
     const wantsTools =
       aiEnabled &&
       !inCooldown() &&
-      shouldTryTools(value, local).route === 'tools'
+      shouldTryTools(value, local, { history: gateHistory }).route === 'tools'
 
     if (wantsTools) {
       try {
@@ -771,6 +787,7 @@ export default function AskAI() {
             privacy: { hidden, accountsHidden },
           },
           deps: { planTools, askGemini },
+          history: thread.text,
         })
 
         if (result.kind === 'answer') {
@@ -1048,6 +1065,27 @@ export default function AskAI() {
             paddingBottom: keyboardVisible ? 10 : Math.max(insets.bottom, 10),
           }}
         >
+          {messages.length ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingBottom: 6 }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Start a new topic"
+                onPress={startNewTopic}
+                hitSlop={4}
+                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text
+                  style={{
+                    fontFamily: fonts.sansMedium,
+                    fontSize: text.caption,
+                    color: c.mutedForeground,
+                  }}
+                >
+                  New topic
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TextInput
               value={input}

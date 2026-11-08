@@ -335,3 +335,117 @@ test('a non-Gemini error becomes none', async () => {
     kind: 'none',
   })
 })
+
+function capturingDeps(plan, answer) {
+  const calls = { plan: 0, ask: 0, planArgs: null, askArgs: null }
+  return {
+    calls,
+    planTools: async (args) => {
+      calls.plan += 1
+      calls.planArgs = args
+      return plan
+    },
+    askGemini: async (args) => {
+      calls.ask += 1
+      calls.askArgs = args
+      return answer ?? { text: 'ok', model: 'gemini', remaining: 1, cap: 50 }
+    },
+  }
+}
+
+test('history is sent under "Conversation so far:" with real names tokenized', async () => {
+  const deps = capturingDeps(
+    { tools: [{ name: 'debts_summary', args: {} }], clarify: '' },
+    { text: 'P1 owes you 500.', model: 'gemini', remaining: 2, cap: 50 },
+  )
+
+  const result = await askWithTools({
+    question: 'what about next month?',
+    ctx: makeCtx(),
+    deps,
+    history: 'You: who owes me\nZen-I: Juan owes you 500.',
+  })
+
+  assert.equal(result.kind, 'answer')
+  assert.match(deps.calls.askArgs.context, /^Conversation so far:\n/)
+  assert.match(deps.calls.askArgs.context, /Tool results/)
+  assert.match(deps.calls.askArgs.context, /follow-up/)
+  assert.equal(deps.calls.askArgs.question, 'what about next month?')
+
+  /* The plan question carries the short history. */
+  assert.match(deps.calls.planArgs.question, /History:/)
+  assert.ok(deps.calls.planArgs.question.length <= 500)
+
+  /* History is re-encoded before it leaves the device. */
+  assert.match(result.sent.history, /P1/)
+  assert.ok(!result.sent.history.includes('Juan'))
+  assert.ok(!JSON.stringify(result.sent).includes('Juan'))
+})
+
+test('a long history and large tool results stay under the 3900 char cap', async () => {
+  const ctx = makeCtx()
+  ctx.data.budgets = Array.from({ length: 120 }, (_, index) => ({
+    id: `${IDS.tx}-b${index}`,
+    category: `Category ${index}`,
+    limit_amount: 1000 + index,
+    period: '2026-11-01',
+  }))
+
+  const longHistory = Array.from({ length: 6 }, (_, index) =>
+    `You: question ${index}\nZen-I: ${'a'.repeat(100)}`,
+  ).join('\n')
+
+  const deps = capturingDeps({
+    tools: [
+      { name: 'budget_status', args: {} },
+      { name: 'budget_status', args: {} },
+      { name: 'budget_status', args: {} },
+      { name: 'budget_status', args: {} },
+    ],
+    clarify: '',
+  })
+
+  const result = await askWithTools({
+    question: 'How are my budgets?',
+    ctx,
+    deps,
+    history: longHistory,
+  })
+
+  assert.equal(result.kind, 'answer')
+  assert.ok(result.sent.context.length <= 3900, `context was ${result.sent.context.length}`)
+  assert.match(result.sent.context, /^Conversation so far:/)
+  assert.match(result.sent.context, /Tool results/)
+  assert.match(result.sent.context, /truncated to fit/)
+})
+
+test('an empty history leaves the current behavior unchanged', async () => {
+  const deps = capturingDeps({
+    tools: [{ name: 'debts_summary', args: {} }],
+    clarify: '',
+  })
+
+  const result = await askWithTools({ question: 'Who owes me?', ctx: makeCtx(), deps })
+
+  assert.equal(deps.calls.planArgs.question, 'Who owes me?')
+  assert.ok(!deps.calls.askArgs.context.includes('Conversation so far:'))
+  assert.ok(!deps.calls.askArgs.context.includes('follow-up'))
+  assert.equal(result.sent.history, '')
+})
+
+test('the plan question never exceeds the proxy 500 char cap', async () => {
+  const deps = capturingDeps({
+    tools: [{ name: 'debts_summary', args: {} }],
+    clarify: '',
+  })
+
+  await askWithTools({
+    question: 'Who owes me?',
+    ctx: makeCtx(),
+    deps,
+    history: 'x'.repeat(900),
+  })
+
+  assert.ok(deps.calls.planArgs.question.length <= 500)
+  assert.equal(deps.calls.planArgs.question, 'Who owes me?')
+})

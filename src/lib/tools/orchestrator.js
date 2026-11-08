@@ -27,24 +27,90 @@ function runTool(name, args, ctx) {
   }
 }
 
-const MAX_CONTEXT_CHARS = 3500
+const MAX_TOOL_CONTEXT_CHARS = 3500
+const MAX_TOTAL_CONTEXT_CHARS = 3900
+const MAX_PLAN_QUESTION_CHARS = 500
 const TRUNCATION_NOTE = '\n… (truncated to fit)'
 const CONTEXT_HEADER =
   'Tool results (already computed, tokens like P1/A1 stand for private names):'
+const HISTORY_HEADER = 'Conversation so far:'
+const FOLLOW_UP_NOTE =
+  "The user's latest message may be a follow-up; answer it in light of the conversation so far."
 
 function isGeminiUnavailable(error) {
   return error?.name === 'GeminiUnavailable'
 }
 
-export async function askWithTools({ question, ctx, deps }) {
+/*
+ * The proxy builds "Question: ...\n\n<context>", so history has to ride in the
+ * question field. It only fits when the whole thing stays under the proxy cap.
+ */
+function planQuestion(question, historyText) {
+  const base = String(question || '')
+  if (!historyText) return base.slice(0, MAX_PLAN_QUESTION_CHARS)
+
+  const combined = `${base}\n\nHistory:\n${historyText}`
+  if (combined.length <= MAX_PLAN_QUESTION_CHARS) return combined
+  return base.slice(0, MAX_PLAN_QUESTION_CHARS)
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/*
+ * History text was decoded for display, so it can contain real names that already
+ * have tokens. Replace those whole values with their tokens before sending. When no
+ * tool has issued a token yet (the plan step), there is nothing to replace.
+ */
+function encodeKnownValues(text, pseudo) {
+  if (!text) return ''
+  const pairs = Object.entries(pseudo.table())
+    .filter(([, value]) => typeof value === 'string' && value.trim())
+    .sort((a, b) => b[1].length - a[1].length)
+
+  let out = String(text)
+  for (const [token, value] of pairs) {
+    const pattern = new RegExp(
+      `(?<![A-Za-z0-9])${escapeRegExp(value)}(?![A-Za-z0-9])`,
+      'gi',
+    )
+    out = out.replace(pattern, token)
+  }
+  return out
+}
+
+function buildToolBlock(entries, budget) {
+  const lines = entries.map(
+    (entry) =>
+      `${entry.tool}: ${JSON.stringify(
+        entry.error !== undefined ? { error: entry.error } : entry.result,
+      )}`,
+  )
+
+  const cap = Math.min(MAX_TOOL_CONTEXT_CHARS, budget)
+  let block = [CONTEXT_HEADER, ...lines].join('\n')
+  if (block.length > cap) {
+    if (cap <= TRUNCATION_NOTE.length) return ''
+    block = block.slice(0, cap - TRUNCATION_NOTE.length).trimEnd() + TRUNCATION_NOTE
+  }
+  return block
+}
+
+export async function askWithTools({ question, ctx, deps, history }) {
   const pseudo = createPseudonymizer()
   const prefs = ctx?.prefs || {}
   const enabled = manifest(prefs).map((tool) => tool.name)
   if (!enabled.length) return { kind: 'off' }
 
+  const historyText = String(history || '').trim()
+
   let plan
   try {
-    plan = await deps.planTools({ question, enabled })
+    plan = await deps.planTools({
+      question: planQuestion(question, historyText),
+      enabled,
+    })
   } catch (error) {
     if (isGeminiUnavailable(error)) throw error
     return { kind: 'none' }
@@ -63,17 +129,17 @@ export async function askWithTools({ question, ctx, deps }) {
     return { tool: entry.name, result }
   })
 
-  const lines = entries.map(
-    (entry) =>
-      `${entry.tool}: ${JSON.stringify(
-        entry.error !== undefined ? { error: entry.error } : entry.result,
-      )}`,
-  )
-  let context = [CONTEXT_HEADER, ...lines].join('\n')
-  if (context.length > MAX_CONTEXT_CHARS) {
-    context =
-      context.slice(0, MAX_CONTEXT_CHARS - TRUNCATION_NOTE.length).trimEnd() +
-      TRUNCATION_NOTE
+  /* Prior answers were decoded for display, so re-encode names tools just tokenized. */
+  const encodedHistory = encodeKnownValues(historyText, pseudo)
+  const historyBlock = encodedHistory
+    ? `${HISTORY_HEADER}\n${encodedHistory}\n\n${FOLLOW_UP_NOTE}\n\n`
+    : ''
+
+  /* Trim the tool results first; the history header is never the thing that goes. */
+  const toolBlock = buildToolBlock(entries, MAX_TOTAL_CONTEXT_CHARS - historyBlock.length)
+  let context = historyBlock + toolBlock
+  if (context.length > MAX_TOTAL_CONTEXT_CHARS) {
+    context = context.slice(0, MAX_TOTAL_CONTEXT_CHARS)
   }
 
   let answer
@@ -94,6 +160,7 @@ export async function askWithTools({ question, ctx, deps }) {
       tools: plan.tools,
       context,
       /* Token names only. Real names in pseudo.table() must never leave the device. */
+      history: encodedHistory,
       tokens: Object.keys(pseudo.table()),
     },
     remaining: answer?.remaining,
